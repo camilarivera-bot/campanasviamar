@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Status Campañas Viamar</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -14,25 +16,20 @@
     <script type="text/babel">
 const { useState, useEffect } = React;
 
-const storage = {
-    get: (key) => {
-        try {
-            const value = localStorage.getItem(key);
-            return value ? { value } : null;
-        } catch (e) {
-            return null;
-        }
-    },
-    set: (key, value) => {
-        try {
-            localStorage.setItem(key, value);
-            return { key, value };
-        } catch (e) {
-            return null;
-        }
-    }
+// Configurar Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyCdH7SDkxWHKRnCIiueEkr5PUOOqmZO_1k",
+  authDomain: "campanas-viamar.firebaseapp.com",
+  projectId: "campanas-viamar",
+  storageBucket: "campanas-viamar.firebasestorage.app",
+  messagingSenderId: "165190287506",
+  appId: "1:165190287506:web:7fc6f39401a136d4a7e64b"
 };
 
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Iconos
 const Plus = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>;
 const Copy = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
 const Save = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
@@ -40,7 +37,6 @@ const Calendar = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="non
 const Trash2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>;
 const Edit2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>;
 const X = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
-const ChevronDown = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>;
 
 const App = () => {
     const [campaigns, setCampaigns] = useState([]);
@@ -56,12 +52,25 @@ const App = () => {
     const [historyFilterDateTo, setHistoryFilterDateTo] = useState('');
     const [selectedMonth, setSelectedMonth] = useState('2025-12');
     const [formData, setFormData] = useState({ name: '', platform: '', objective: '', plannedCPL: '' });
+    const [loading, setLoading] = useState(true);
 
+    // Cargar datos desde Firebase
     useEffect(() => {
-        const c = storage.get('campaigns-master');
-        const u = storage.get('daily-updates');
-        if (c) setCampaigns(JSON.parse(c.value));
-        if (u) setDailyUpdates(JSON.parse(u.value));
+        const unsubscribeCampaigns = db.collection('campaigns').onSnapshot(snapshot => {
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setCampaigns(data);
+            setLoading(false);
+        });
+
+        const unsubscribeUpdates = db.collection('dailyUpdates').orderBy('date', 'desc').onSnapshot(snapshot => {
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setDailyUpdates(data);
+        });
+
+        return () => {
+            unsubscribeCampaigns();
+            unsubscribeUpdates();
+        };
     }, []);
 
     useEffect(() => {
@@ -70,31 +79,32 @@ const App = () => {
         }
     }, [campaigns]);
 
-    const saveCampaigns = (c) => storage.set('campaigns-master', JSON.stringify(c));
-    const saveDailyUpdates = (u) => storage.set('daily-updates', JSON.stringify(u));
-
-    const handleAddCampaign = () => {
+    const handleAddCampaign = async () => {
         if (formData.name && formData.objective && formData.platform) {
-            const c = [...campaigns, { ...formData, id: Date.now() }];
-            setCampaigns(c);
-            saveCampaigns(c);
+            await db.collection('campaigns').add({
+                ...formData,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
             setFormData({ name: '', platform: '', objective: '', plannedCPL: '' });
             setShowForm(false);
         }
     };
 
-    const handleEditCampaign = () => {
-        const c = campaigns.map(x => x.id === editingCampaign.id ? editingCampaign : x);
-        setCampaigns(c);
-        saveCampaigns(c);
-        setEditingCampaign(null);
+    const handleEditCampaign = async () => {
+        if (editingCampaign) {
+            await db.collection('campaigns').doc(editingCampaign.id).update({
+                name: editingCampaign.name,
+                platform: editingCampaign.platform,
+                objective: editingCampaign.objective,
+                plannedCPL: editingCampaign.plannedCPL
+            });
+            setEditingCampaign(null);
+        }
     };
 
-    const handleDeleteCampaign = (id) => {
+    const handleDeleteCampaign = async (id) => {
         if (confirm('¿Eliminar campaña?')) {
-            const c = campaigns.filter(x => x.id !== id);
-            setCampaigns(c);
-            saveCampaigns(c);
+            await db.collection('campaigns').doc(id).delete();
         }
     };
 
@@ -102,14 +112,13 @@ const App = () => {
         setTodayStatus({ ...todayStatus, [id]: { ...todayStatus[id], [field]: value } });
     };
 
-    const handleSaveDailyStatus = () => {
+    const handleSaveDailyStatus = async () => {
         const hasData = Object.keys(todayStatus).some(id => todayStatus[id]?.currentLeads || todayStatus[id]?.currentCPL || todayStatus[id]?.comment);
         if (!hasData) return alert('Agrega datos');
-        
-        const idx = dailyUpdates.findIndex(u => u.date === updateDate);
+
         const entry = {
             date: updateDate,
-            datetime: new Date().toISOString(),
+            datetime: firebase.firestore.FieldValue.serverTimestamp(),
             campaigns: campaigns.map(c => ({
                 campaignId: c.id,
                 name: c.name,
@@ -122,15 +131,17 @@ const App = () => {
             })).filter(c => c.currentLeads || c.currentCPL || c.comment)
         };
 
-        let u;
-        if (idx >= 0) {
-            u = [...dailyUpdates];
-            u[idx] = entry;
+        // Verificar si existe un update para esta fecha
+        const existing = await db.collection('dailyUpdates').where('date', '==', updateDate).get();
+        
+        if (!existing.empty) {
+            // Actualizar existente
+            await db.collection('dailyUpdates').doc(existing.docs[0].id).update(entry);
         } else {
-            u = [entry, ...dailyUpdates].sort((a, b) => new Date(b.date) - new Date(a.date));
+            // Crear nuevo
+            await db.collection('dailyUpdates').add(entry);
         }
-        setDailyUpdates(u);
-        saveDailyUpdates(u);
+
         setTodayStatus({});
         alert('Guardado');
     };
@@ -140,7 +151,7 @@ const App = () => {
         const cams = getUpdateCampaigns().filter(c => todayStatus[c.id]?.currentLeads || todayStatus[c.id]?.currentCPL || todayStatus[c.id]?.comment);
         if (cams.length === 0) return '(Sin datos)';
         
-        return cams.map((c, i) => {
+        return cams.map((c) => {
             const s = todayStatus[c.id] || {};
             let m = `Resumen campaña ${c.name}`;
             if (c.platform) m += ` - ${c.platform}`;
@@ -161,12 +172,11 @@ const App = () => {
         alert('Copiado');
     };
 
-    const getFilteredCampaigns = () => selectedCampaign === 'all' ? campaigns : campaigns.filter(c => c.id.toString() === selectedCampaign);
-    const getUpdateCampaigns = () => selectedUpdateCampaigns.length === 0 ? campaigns : campaigns.filter(c => selectedUpdateCampaigns.includes(c.id.toString()));
+    const getFilteredCampaigns = () => selectedCampaign === 'all' ? campaigns : campaigns.filter(c => c.id === selectedCampaign);
+    const getUpdateCampaigns = () => selectedUpdateCampaigns.length === 0 ? campaigns : campaigns.filter(c => selectedUpdateCampaigns.includes(c.id));
     
     const toggleCampaignSelection = (id) => {
-        const s = id.toString();
-        setSelectedUpdateCampaigns(selectedUpdateCampaigns.includes(s) ? selectedUpdateCampaigns.filter(x => x !== s) : [...selectedUpdateCampaigns, s]);
+        setSelectedUpdateCampaigns(selectedUpdateCampaigns.includes(id) ? selectedUpdateCampaigns.filter(x => x !== id) : [...selectedUpdateCampaigns, id]);
     };
 
     const getFilteredHistory = () => {
@@ -203,11 +213,9 @@ const App = () => {
         };
     };
 
-    const deleteUpdate = (date) => {
+    const deleteUpdate = async (id) => {
         if (confirm('¿Eliminar?')) {
-            const u = dailyUpdates.filter(x => x.date !== date);
-            setDailyUpdates(u);
-            saveDailyUpdates(u);
+            await db.collection('dailyUpdates').doc(id).delete();
         }
     };
 
@@ -222,12 +230,24 @@ const App = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600 mb-4">Cargando datos...</div>
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
             <div className="max-w-7xl mx-auto">
                 <div className="text-center mb-6">
                     <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-2">STATUS CAMPAÑAS VIAMAR</h1>
                     <div className="h-1 w-32 mx-auto bg-gradient-to-r from-blue-600 to-purple-600 rounded-full"></div>
+                    <div className="mt-2 text-sm text-green-600 font-semibold">🔄 Datos compartidos en tiempo real</div>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
@@ -290,6 +310,8 @@ const App = () => {
                                     <option value="Meta">Meta</option>
                                     <option value="Google PMAX">Google PMAX</option>
                                     <option value="Google Búsqueda">Google Búsqueda</option>
+                                    <option value="Google Display">Google Display</option>
+                                    <option value="Google Video">Google Video</option>
                                 </select>
                                 <input type="number" placeholder="Objetivo" value={formData.objective} onChange={(e) => setFormData({...formData, objective: e.target.value})} className="px-4 py-2 border rounded-lg"/>
                                 <input type="number" step="0.01" placeholder="CPL USD" value={formData.plannedCPL} onChange={(e) => setFormData({...formData, plannedCPL: e.target.value})} className="px-4 py-2 border rounded-lg"/>
@@ -304,14 +326,39 @@ const App = () => {
                     <div className="space-y-2">
                         {getFilteredCampaigns().map(c => (
                             <div key={c.id} className="bg-gray-50 rounded-lg p-4 flex justify-between items-center">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-semibold">{c.name}</span>
-                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
+                                {editingCampaign?.id === c.id ? (
+                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-2">
+                                        <input type="text" value={editingCampaign.name} onChange={(e) => setEditingCampaign({...editingCampaign, name: e.target.value})} className="px-3 py-1 border rounded"/>
+                                        <select value={editingCampaign.platform} onChange={(e) => setEditingCampaign({...editingCampaign, platform: e.target.value})} className="px-3 py-1 border rounded">
+                                            <option value="Meta">Meta</option>
+                                            <option value="Google PMAX">Google PMAX</option>
+                                            <option value="Google Búsqueda">Google Búsqueda</option>
+                                        </select>
+                                        <input type="number" value={editingCampaign.objective} onChange={(e) => setEditingCampaign({...editingCampaign, objective: e.target.value})} className="px-3 py-1 border rounded"/>
+                                        <input type="number" step="0.01" value={editingCampaign.plannedCPL} onChange={(e) => setEditingCampaign({...editingCampaign, plannedCPL: e.target.value})} className="px-3 py-1 border rounded"/>
                                     </div>
-                                    <div className="text-sm text-gray-600">Objetivo: {c.objective} | CPL: ${c.plannedCPL || 'N/A'}</div>
+                                ) : (
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-semibold">{c.name}</span>
+                                            <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
+                                        </div>
+                                        <div className="text-sm text-gray-600">Objetivo: {c.objective} | CPL: ${c.plannedCPL || 'N/A'}</div>
+                                    </div>
+                                )}
+                                <div className="flex gap-2">
+                                    {editingCampaign?.id === c.id ? (
+                                        <>
+                                            <button onClick={handleEditCampaign} className="text-green-600"><Save /></button>
+                                            <button onClick={() => setEditingCampaign(null)} className="text-gray-600"><X /></button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button onClick={() => setEditingCampaign(c)} className="text-blue-600"><Edit2 /></button>
+                                            <button onClick={() => handleDeleteCampaign(c.id)} className="text-red-500"><Trash2 /></button>
+                                        </>
+                                    )}
                                 </div>
-                                <button onClick={() => handleDeleteCampaign(c.id)} className="text-red-500"><Trash2 /></button>
                             </div>
                         ))}
                     </div>
@@ -334,14 +381,14 @@ const App = () => {
                             <div className="flex justify-between items-center mb-3">
                                 <h3 className="font-semibold">Selecciona campañas:</h3>
                                 <div className="flex gap-2">
-                                    <button onClick={() => setSelectedUpdateCampaigns(campaigns.map(c => c.id.toString()))} className="text-sm px-3 py-1 bg-blue-600 text-white rounded">Todas</button>
+                                    <button onClick={() => setSelectedUpdateCampaigns(campaigns.map(c => c.id))} className="text-sm px-3 py-1 bg-blue-600 text-white rounded">Todas</button>
                                     <button onClick={() => setSelectedUpdateCampaigns([])} className="text-sm px-3 py-1 bg-gray-300 rounded">Ninguna</button>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                 {campaigns.map(c => (
-                                    <label key={c.id} className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${selectedUpdateCampaigns.includes(c.id.toString()) ? 'bg-blue-100 border-2 border-blue-500' : 'bg-white border-2 border-gray-200'}`}>
-                                        <input type="checkbox" checked={selectedUpdateCampaigns.includes(c.id.toString())} onChange={() => toggleCampaignSelection(c.id)} className="w-4 h-4"/>
+                                    <label key={c.id} className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${selectedUpdateCampaigns.includes(c.id) ? 'bg-blue-100 border-2 border-blue-500' : 'bg-white border-2 border-gray-200'}`}>
+                                        <input type="checkbox" checked={selectedUpdateCampaigns.includes(c.id)} onChange={() => toggleCampaignSelection(c.id)} className="w-4 h-4"/>
                                         <div className="flex-1 min-w-0">
                                             <div className="font-medium text-sm truncate">{c.name}</div>
                                             <div className="text-xs text-gray-500">{c.platform}</div>
@@ -396,7 +443,7 @@ const App = () => {
                                 const p = to > 0 ? ((tl / to) * 100).toFixed(1) : 0;
                                 
                                 return (
-                                    <div key={u.date} className="border-2 rounded-xl p-5 bg-gradient-to-r from-white to-gray-50">
+                                    <div key={u.id} className="border-2 rounded-xl p-5 bg-gradient-to-r from-white to-gray-50">
                                         <div className="flex justify-between items-start mb-4">
                                             <div>
                                                 <div className="flex items-center gap-3 mb-2">
@@ -411,7 +458,7 @@ const App = () => {
                                             </div>
                                             <div className="flex gap-2">
                                                 <button onClick={() => loadUpdate(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 /></button>
-                                                <button onClick={() => deleteUpdate(u.date)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 /></button>
+                                                <button onClick={() => deleteUpdate(u.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 /></button>
                                             </div>
                                         </div>
 
