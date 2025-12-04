@@ -11,577 +11,457 @@
 </head>
 <body>
     <div id="root"></div>
-    
     <script type="text/babel">
-        const { useState, useEffect } = React;
+const { useState, useEffect } = React;
+
+const storage = {
+    get: (key) => {
+        try {
+            const value = localStorage.getItem(key);
+            return value ? { value } : null;
+        } catch (e) {
+            return null;
+        }
+    },
+    set: (key, value) => {
+        try {
+            localStorage.setItem(key, value);
+            return { key, value };
+        } catch (e) {
+            return null;
+        }
+    }
+};
+
+const Plus = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>;
+const Copy = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
+const Save = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
+const Calendar = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+const Trash2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>;
+const Edit2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>;
+const X = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const ChevronDown = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>;
+
+const App = () => {
+    const [campaigns, setCampaigns] = useState([]);
+    const [dailyUpdates, setDailyUpdates] = useState([]);
+    const [showForm, setShowForm] = useState(false);
+    const [editingCampaign, setEditingCampaign] = useState(null);
+    const [todayStatus, setTodayStatus] = useState({});
+    const [updateDate, setUpdateDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedCampaign, setSelectedCampaign] = useState('all');
+    const [selectedUpdateCampaigns, setSelectedUpdateCampaigns] = useState([]);
+    const [historyFilterPlatform, setHistoryFilterPlatform] = useState('all');
+    const [historyFilterDateFrom, setHistoryFilterDateFrom] = useState('');
+    const [historyFilterDateTo, setHistoryFilterDateTo] = useState('');
+    const [selectedMonth, setSelectedMonth] = useState('2025-12');
+    const [formData, setFormData] = useState({ name: '', platform: '', objective: '', plannedCPL: '' });
+
+    useEffect(() => {
+        const c = storage.get('campaigns-master');
+        const u = storage.get('daily-updates');
+        if (c) setCampaigns(JSON.parse(c.value));
+        if (u) setDailyUpdates(JSON.parse(u.value));
+    }, []);
+
+    useEffect(() => {
+        if (campaigns.length > 0 && selectedUpdateCampaigns.length === 0) {
+            setSelectedUpdateCampaigns(campaigns.map(c => c.id.toString()));
+        }
+    }, [campaigns]);
+
+    const saveCampaigns = (c) => storage.set('campaigns-master', JSON.stringify(c));
+    const saveDailyUpdates = (u) => storage.set('daily-updates', JSON.stringify(u));
+
+    const handleAddCampaign = () => {
+        if (formData.name && formData.objective && formData.platform) {
+            const c = [...campaigns, { ...formData, id: Date.now() }];
+            setCampaigns(c);
+            saveCampaigns(c);
+            setFormData({ name: '', platform: '', objective: '', plannedCPL: '' });
+            setShowForm(false);
+        }
+    };
+
+    const handleEditCampaign = () => {
+        const c = campaigns.map(x => x.id === editingCampaign.id ? editingCampaign : x);
+        setCampaigns(c);
+        saveCampaigns(c);
+        setEditingCampaign(null);
+    };
+
+    const handleDeleteCampaign = (id) => {
+        if (confirm('¿Eliminar campaña?')) {
+            const c = campaigns.filter(x => x.id !== id);
+            setCampaigns(c);
+            saveCampaigns(c);
+        }
+    };
+
+    const handleStatusChange = (id, field, value) => {
+        setTodayStatus({ ...todayStatus, [id]: { ...todayStatus[id], [field]: value } });
+    };
+
+    const handleSaveDailyStatus = () => {
+        const hasData = Object.keys(todayStatus).some(id => todayStatus[id]?.currentLeads || todayStatus[id]?.currentCPL || todayStatus[id]?.comment);
+        if (!hasData) return alert('Agrega datos');
         
-        // Storage simple con localStorage
-        const storage = {
-            get: (key) => {
-                try {
-                    const value = localStorage.getItem(key);
-                    return value ? { value } : null;
-                } catch (e) {
-                    return null;
-                }
-            },
-            set: (key, value) => {
-                try {
-                    localStorage.setItem(key, value);
-                    return { key, value };
-                } catch (e) {
-                    return null;
-                }
-            }
+        const idx = dailyUpdates.findIndex(u => u.date === updateDate);
+        const entry = {
+            date: updateDate,
+            datetime: new Date().toISOString(),
+            campaigns: campaigns.map(c => ({
+                campaignId: c.id,
+                name: c.name,
+                platform: c.platform,
+                objective: c.objective,
+                plannedCPL: c.plannedCPL,
+                currentLeads: todayStatus[c.id]?.currentLeads || '',
+                currentCPL: todayStatus[c.id]?.currentCPL || '',
+                comment: todayStatus[c.id]?.comment || ''
+            })).filter(c => c.currentLeads || c.currentCPL || c.comment)
         };
 
-        // Iconos SVG
-        const Plus = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>;
-        const Copy = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
-        const Save = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
-        const Calendar = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
-        const Trash2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>;
-        const Edit2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>;
-        const X = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
-        const ChevronDown = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>;
+        let u;
+        if (idx >= 0) {
+            u = [...dailyUpdates];
+            u[idx] = entry;
+        } else {
+            u = [entry, ...dailyUpdates].sort((a, b) => new Date(b.date) - new Date(a.date));
+        }
+        setDailyUpdates(u);
+        saveDailyUpdates(u);
+        setTodayStatus({});
+        alert('Guardado');
+    };
 
-        const CampaignStatusTracker = () => {
-            const [campaigns, setCampaigns] = useState([]);
-            const [dailyUpdates, setDailyUpdates] = useState([]);
-            const [showForm, setShowForm] = useState(false);
-            const [editingCampaign, setEditingCampaign] = useState(null);
-            const [todayStatus, setTodayStatus] = useState({});
-            const [updateDate, setUpdateDate] = useState(new Date().toISOString().split('T')[0]);
-            const [selectedCampaign, setSelectedCampaign] = useState('all');
-            const [selectedUpdateCampaigns, setSelectedUpdateCampaigns] = useState([]);
-            const [historyFilterPlatform, setHistoryFilterPlatform] = useState('all');
-            const [historyFilterDateFrom, setHistoryFilterDateFrom] = useState('');
-            const [historyFilterDateTo, setHistoryFilterDateTo] = useState('');
-            const [selectedMonth, setSelectedMonth] = useState('2025-12');
-            
-            const [formData, setFormData] = useState({
-                name: '',
-                platform: '',
-                objective: '',
-                plannedCPL: ''
-            });
+    const generateMessage = () => {
+        const date = new Date(updateDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+        const cams = getUpdateCampaigns().filter(c => todayStatus[c.id]?.currentLeads || todayStatus[c.id]?.currentCPL || todayStatus[c.id]?.comment);
+        if (cams.length === 0) return '(Sin datos)';
+        
+        return cams.map((c, i) => {
+            const s = todayStatus[c.id] || {};
+            let m = `Resumen campaña ${c.name}`;
+            if (c.platform) m += ` - ${c.platform}`;
+            m += ` - con corte a ${date}\n\n`;
+            m += `* Objetivo: ${c.objective} leads\n`;
+            if (c.plannedCPL) m += `* CPL planificado: ${c.plannedCPL} USD\n`;
+            if (s.currentLeads) m += `* Avance: ${s.currentLeads} leads\n`;
+            if (s.currentCPL) m += `* CPL actual: ${s.currentCPL} USD\n`;
+            if (s.comment) m += `Comentario: ${s.comment}`;
+            return m;
+        }).join('\n\n');
+    };
 
-            useEffect(() => {
-                loadData();
-            }, []);
+    const copyToClipboard = () => {
+        const m = generateMessage();
+        if (m.includes('Sin datos')) return alert('Agrega datos');
+        navigator.clipboard.writeText(m);
+        alert('Copiado');
+    };
 
-            useEffect(() => {
-                if (campaigns.length > 0 && selectedUpdateCampaigns.length === 0) {
-                    setSelectedUpdateCampaigns(campaigns.map(c => c.id.toString()));
-                }
-            }, [campaigns]);
+    const getFilteredCampaigns = () => selectedCampaign === 'all' ? campaigns : campaigns.filter(c => c.id.toString() === selectedCampaign);
+    const getUpdateCampaigns = () => selectedUpdateCampaigns.length === 0 ? campaigns : campaigns.filter(c => selectedUpdateCampaigns.includes(c.id.toString()));
+    
+    const toggleCampaignSelection = (id) => {
+        const s = id.toString();
+        setSelectedUpdateCampaigns(selectedUpdateCampaigns.includes(s) ? selectedUpdateCampaigns.filter(x => x !== s) : [...selectedUpdateCampaigns, s]);
+    };
 
-            const loadData = () => {
-                const campaignsResult = storage.get('campaigns-master');
-                const updatesResult = storage.get('daily-updates');
-                
-                if (campaignsResult) {
-                    setCampaigns(JSON.parse(campaignsResult.value));
-                }
-                
-                if (updatesResult) {
-                    setDailyUpdates(JSON.parse(updatesResult.value));
-                }
-            };
+    const getFilteredHistory = () => {
+        let f = [...dailyUpdates];
+        if (historyFilterPlatform !== 'all') {
+            f = f.map(u => ({ ...u, campaigns: u.campaigns.filter(c => c.platform === historyFilterPlatform) })).filter(u => u.campaigns.length > 0);
+        }
+        if (historyFilterDateFrom) f = f.filter(u => u.date >= historyFilterDateFrom);
+        if (historyFilterDateTo) f = f.filter(u => u.date <= historyFilterDateTo);
+        return f;
+    };
 
-            const saveCampaigns = (newCampaigns) => {
-                storage.set('campaigns-master', JSON.stringify(newCampaigns));
-            };
+    const getUniquePlatforms = () => Array.from(new Set(campaigns.map(c => c.platform)));
 
-            const saveDailyUpdates = (newUpdates) => {
-                storage.set('daily-updates', JSON.stringify(newUpdates));
-            };
+    const getMonthlyStats = () => {
+        const m = dailyUpdates.filter(u => u.date.startsWith(selectedMonth));
+        if (m.length === 0) return { totalLeads: 0, totalObjective: 0, progress: 0, avgCPL: 0 };
+        
+        let tl = 0, to = 0, ts = 0;
+        m[0].campaigns.forEach(c => {
+            const l = parseInt(c.currentLeads) || 0;
+            const o = parseInt(c.objective) || 0;
+            const cpl = parseFloat(c.currentCPL) || 0;
+            tl += l;
+            to += o;
+            if (cpl > 0 && l > 0) ts += (cpl * l);
+        });
+        
+        return {
+            totalLeads: tl,
+            totalObjective: to,
+            progress: to > 0 ? ((tl / to) * 100).toFixed(1) : 0,
+            avgCPL: tl > 0 ? (ts / tl).toFixed(2) : 0
+        };
+    };
 
-            const handleAddCampaign = () => {
-                if (formData.name && formData.objective && formData.platform) {
-                    const newCampaign = { ...formData, id: Date.now() };
-                    const newCampaigns = [...campaigns, newCampaign];
-                    setCampaigns(newCampaigns);
-                    saveCampaigns(newCampaigns);
-                    setFormData({ name: '', platform: '', objective: '', plannedCPL: '' });
-                    setShowForm(false);
-                }
-            };
+    const deleteUpdate = (date) => {
+        if (confirm('¿Eliminar?')) {
+            const u = dailyUpdates.filter(x => x.date !== date);
+            setDailyUpdates(u);
+            saveDailyUpdates(u);
+        }
+    };
 
-            const handleEditCampaign = () => {
-                if (editingCampaign) {
-                    const updatedCampaigns = campaigns.map(c => 
-                        c.id === editingCampaign.id ? editingCampaign : c
-                    );
-                    setCampaigns(updatedCampaigns);
-                    saveCampaigns(updatedCampaigns);
-                    setEditingCampaign(null);
-                }
-            };
+    const loadUpdate = (u) => {
+        const s = {};
+        u.campaigns.forEach(c => {
+            s[c.campaignId] = { currentLeads: c.currentLeads, currentCPL: c.currentCPL, comment: c.comment };
+        });
+        setTodayStatus(s);
+        setUpdateDate(u.date);
+        alert('Cargado');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-            const handleDeleteCampaign = (id) => {
-                if (confirm('¿Estás seguro de eliminar esta campaña?')) {
-                    const newCampaigns = campaigns.filter(c => c.id !== id);
-                    setCampaigns(newCampaigns);
-                    saveCampaigns(newCampaigns);
-                    
-                    const newUpdates = dailyUpdates.map(update => ({
-                        ...update,
-                        campaigns: update.campaigns.filter(c => c.campaignId !== id)
-                    })).filter(update => update.campaigns.length > 0);
-                    
-                    setDailyUpdates(newUpdates);
-                    saveDailyUpdates(newUpdates);
-                }
-            };
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+            <div className="max-w-7xl mx-auto">
+                <div className="text-center mb-6">
+                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-2">STATUS CAMPAÑAS VIAMAR</h1>
+                    <div className="h-1 w-32 mx-auto bg-gradient-to-r from-blue-600 to-purple-600 rounded-full"></div>
+                </div>
 
-            const handleStatusChange = (campaignId, field, value) => {
-                setTodayStatus({
-                    ...todayStatus,
-                    [campaignId]: {
-                        ...todayStatus[campaignId],
-                        [field]: value
-                    }
-                });
-            };
+                <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <div className="mb-4">
+                        <label className="text-sm font-semibold text-gray-700 mr-3">Ver estadísticas del mes:</label>
+                        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg bg-white font-medium">
+                            <option value="2025-12">Diciembre de 2025</option>
+                            <option value="2025-11">Noviembre de 2025</option>
+                        </select>
+                    </div>
 
-            const handleSaveDailyStatus = () => {
-                const hasData = Object.keys(todayStatus).some(id => 
-                    todayStatus[id]?.currentLeads || todayStatus[id]?.currentCPL || todayStatus[id]?.comment
-                );
-
-                if (!hasData) {
-                    alert('Agrega al menos un dato de progreso antes de guardar');
-                    return;
-                }
-                
-                const existingIndex = dailyUpdates.findIndex(u => u.date === updateDate);
-                
-                const statusEntry = {
-                    date: updateDate,
-                    datetime: new Date().toISOString(),
-                    campaigns: campaigns.map(campaign => ({
-                        campaignId: campaign.id,
-                        name: campaign.name,
-                        platform: campaign.platform,
-                        objective: campaign.objective,
-                        plannedCPL: campaign.plannedCPL,
-                        currentLeads: todayStatus[campaign.id]?.currentLeads || '',
-                        currentCPL: todayStatus[campaign.id]?.currentCPL || '',
-                        comment: todayStatus[campaign.id]?.comment || ''
-                    })).filter(c => c.currentLeads || c.currentCPL || c.comment)
-                };
-
-                let newUpdates;
-                if (existingIndex >= 0) {
-                    newUpdates = [...dailyUpdates];
-                    newUpdates[existingIndex] = statusEntry;
-                    alert('Status actualizado exitosamente');
-                } else {
-                    newUpdates = [statusEntry, ...dailyUpdates].sort((a, b) => new Date(b.date) - new Date(a.date));
-                    alert('Status guardado exitosamente');
-                }
-
-                setDailyUpdates(newUpdates);
-                saveDailyUpdates(newUpdates);
-                setTodayStatus({});
-                setUpdateDate(new Date().toISOString().split('T')[0]);
-            };
-
-            const generateMessage = () => {
-                const messageDate = new Date(updateDate).toLocaleDateString('es-ES', { 
-                    day: 'numeric', 
-                    month: 'long',
-                    year: 'numeric'
-                });
-                
-                const campaignsToShow = getUpdateCampaigns();
-                const campaignsWithData = campaignsToShow.filter(campaign => 
-                    todayStatus[campaign.id]?.currentLeads || todayStatus[campaign.id]?.currentCPL || todayStatus[campaign.id]?.comment
-                );
-
-                if (campaignsWithData.length === 0) {
-                    return '(No hay datos de progreso para esta fecha)';
-                }
-
-                let message = '';
-                
-                campaignsWithData.forEach((campaign, index) => {
-                    const status = todayStatus[campaign.id] || {};
-                    if (index > 0) message += '\n\n';
-                    
-                    message += `Resumen campaña ${campaign.name}`;
-                    if (campaign.platform) message += ` - ${campaign.platform}`;
-                    message += ` - con corte a ${messageDate}\n\n`;
-                    message += `* Objetivo: ${campaign.objective} leads\n`;
-                    if (campaign.plannedCPL) message += `* CPL planificado: ${campaign.plannedCPL} USD\n`;
-                    if (status.currentLeads) message += `* Avance: ${status.currentLeads} leads\n`;
-                    if (status.currentCPL) message += `* CPL actual: ${status.currentCPL} USD\n`;
-                    if (status.comment) message += `Comentario: ${status.comment}`;
-                });
-                
-                return message;
-            };
-
-            const copyToClipboard = () => {
-                const message = generateMessage();
-                if (message.includes('No hay datos')) {
-                    alert('Agrega datos de progreso antes de copiar el mensaje');
-                    return;
-                }
-                navigator.clipboard.writeText(message);
-                alert('Mensaje copiado al portapapeles');
-            };
-
-            const getFilteredCampaigns = () => {
-                if (selectedCampaign === 'all') return campaigns;
-                return campaigns.filter(c => c.id.toString() === selectedCampaign);
-            };
-
-            const getUpdateCampaigns = () => {
-                if (selectedUpdateCampaigns.length === 0) return campaigns;
-                return campaigns.filter(c => selectedUpdateCampaigns.includes(c.id.toString()));
-            };
-
-            const toggleCampaignSelection = (campaignId) => {
-                const idStr = campaignId.toString();
-                if (selectedUpdateCampaigns.includes(idStr)) {
-                    setSelectedUpdateCampaigns(selectedUpdateCampaigns.filter(id => id !== idStr));
-                } else {
-                    setSelectedUpdateCampaigns([...selectedUpdateCampaigns, idStr]);
-                }
-            };
-
-            const selectAllCampaigns = () => {
-                setSelectedUpdateCampaigns(campaigns.map(c => c.id.toString()));
-            };
-
-            const deselectAllCampaigns = () => {
-                setSelectedUpdateCampaigns([]);
-            };
-
-            const getFilteredHistory = () => {
-                let filtered = [...dailyUpdates];
-
-                if (historyFilterPlatform !== 'all') {
-                    filtered = filtered.map(update => ({
-                        ...update,
-                        campaigns: update.campaigns.filter(c => c.platform === historyFilterPlatform)
-                    })).filter(update => update.campaigns.length > 0);
-                }
-
-                if (historyFilterDateFrom) {
-                    filtered = filtered.filter(update => update.date >= historyFilterDateFrom);
-                }
-                if (historyFilterDateTo) {
-                    filtered = filtered.filter(update => update.date <= historyFilterDateTo);
-                }
-
-                return filtered;
-            };
-
-            const getUniquePlatforms = () => {
-                const platforms = new Set();
-                campaigns.forEach(c => platforms.add(c.platform));
-                return Array.from(platforms);
-            };
-
-            const getMonthlyStats = () => {
-                const monthUpdates = dailyUpdates.filter(update => {
-                    return update.date.startsWith(selectedMonth);
-                });
-
-                if (monthUpdates.length === 0) {
-                    return { totalLeads: 0, totalObjective: 0, progress: 0, avgCPL: 0 };
-                }
-
-                const latestUpdate = monthUpdates[0];
-                
-                let totalLeads = 0;
-                let totalObjective = 0;
-                let totalSpent = 0;
-
-                latestUpdate.campaigns.forEach(campaign => {
-                    const leads = parseInt(campaign.currentLeads) || 0;
-                    const objective = parseInt(campaign.objective) || 0;
-                    const cpl = parseFloat(campaign.currentCPL) || 0;
-                    
-                    totalLeads += leads;
-                    totalObjective += objective;
-                    
-                    if (cpl > 0 && leads > 0) {
-                        totalSpent += (cpl * leads);
-                    }
-                });
-
-                const progress = totalObjective > 0 ? ((totalLeads / totalObjective) * 100).toFixed(1) : 0;
-                const avgCPL = totalLeads > 0 ? (totalSpent / totalLeads).toFixed(2) : 0;
-
-                return { totalLeads, totalObjective, progress, avgCPL };
-            };
-
-            const deleteUpdate = (date) => {
-                if (confirm('¿Estás seguro de eliminar este registro?')) {
-                    const newUpdates = dailyUpdates.filter(u => u.date !== date);
-                    setDailyUpdates(newUpdates);
-                    saveDailyUpdates(newUpdates);
-                }
-            };
-
-            const loadUpdateToToday = (update) => {
-                const newStatus = {};
-                update.campaigns.forEach(campaign => {
-                    newStatus[campaign.campaignId] = {
-                        currentLeads: campaign.currentLeads,
-                        currentCPL: campaign.currentCPL,
-                        comment: campaign.comment
-                    };
-                });
-                setTodayStatus(newStatus);
-                setUpdateDate(update.date);
-                alert('Datos cargados para editar');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
-
-            return (
-                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-                    <div className="max-w-7xl mx-auto">
-                        <div className="text-center mb-6">
-                            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-2">
-                                STATUS CAMPAÑAS VIAMAR
-                            </h1>
-                            <div className="h-1 w-32 mx-auto bg-gradient-to-r from-blue-600 to-purple-600 rounded-full"></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-4 text-white">
+                            <div className="text-sm opacity-90">Total Leads del Mes</div>
+                            <div className="text-3xl font-bold">{getMonthlyStats().totalLeads}</div>
+                            <div className="text-sm opacity-90">acumulados</div>
                         </div>
-
-                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-                            <div className="mb-4">
-                                <label className="text-sm font-semibold text-gray-700 mr-3">Ver estadísticas del mes:</label>
-                                <select
-                                    value={selectedMonth}
-                                    onChange={(e) => setSelectedMonth(e.target.value)}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg bg-white font-medium"
-                                >
-                                    <option value="2025-12">Diciembre de 2025</option>
-                                    <option value="2025-11">Noviembre de 2025</option>
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                                <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-4 text-white">
-                                    <div className="text-sm opacity-90">Total Leads del Mes</div>
-                                    <div className="text-3xl font-bold">{getMonthlyStats().totalLeads}</div>
-                                    <div className="text-sm opacity-90">acumulados</div>
-                                </div>
-                                <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-4 text-white">
-                                    <div className="text-sm opacity-90">Objetivo del Mes</div>
-                                    <div className="text-3xl font-bold">{getMonthlyStats().totalObjective}</div>
-                                    <div className="text-sm opacity-90">leads meta</div>
-                                </div>
-                                <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-4 text-white">
-                                    <div className="text-sm opacity-90">Progreso Mensual</div>
-                                    <div className="text-3xl font-bold">{getMonthlyStats().progress}%</div>
-                                    <div className="text-sm opacity-90">del objetivo</div>
-                                </div>
-                                <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-4 text-white">
-                                    <div className="text-sm opacity-90">CPL Promedio</div>
-                                    <div className="text-3xl font-bold">${getMonthlyStats().avgCPL}</div>
-                                    <div className="text-sm opacity-90">por lead</div>
-                                </div>
-                            </div>
-
-                            {campaigns.length > 0 && (
-                                <div className="flex items-center gap-3 mb-4">
-                                    <label className="text-sm font-semibold text-gray-700">Mostrar campaña:</label>
-                                    <div className="relative">
-                                        <select
-                                            value={selectedCampaign}
-                                            onChange={(e) => setSelectedCampaign(e.target.value)}
-                                            className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm font-medium text-gray-700 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                                        >
-                                            <option value="all">Todas las campañas</option>
-                                            {campaigns.map(campaign => (
-                                                <option key={campaign.id} value={campaign.id.toString()}>
-                                                    {campaign.name} - {campaign.platform}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown />
-                                    </div>
-                                </div>
-                            )}
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-4 text-white">
+                            <div className="text-sm opacity-90">Objetivo del Mes</div>
+                            <div className="text-3xl font-bold">{getMonthlyStats().totalObjective}</div>
+                            <div className="text-sm opacity-90">leads meta</div>
                         </div>
-
-                        {/* Resto del componente continúa igual... */}
-                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-2xl font-bold text-gray-800">Mis Campañas</h2>
-                                <button
-                                    onClick={() => setShowForm(!showForm)}
-                                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-                                >
-                                    <Plus />
-                                    Nueva Campaña
-                                </button>
-                            </div>
-
-                            {showForm && (
-                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                                    <h3 className="font-semibold text-lg mb-4">Configurar Nueva Campaña</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <input
-                                            type="text"
-                                            placeholder="Nombre de campaña"
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                            className="px-4 py-2 border border-gray-300 rounded-lg"
-                                        />
-                                        <select
-                                            value={formData.platform}
-                                            onChange={(e) => setFormData({...formData, platform: e.target.value})}
-                                            className="px-4 py-2 border border-gray-300 rounded-lg bg-white"
-                                        >
-                                            <option value="">Seleccionar plataforma</option>
-                                            <option value="Meta">Meta</option>
-                                            <option value="Google PMAX">Google PMAX</option>
-                                            <option value="Google Búsqueda">Google Búsqueda</option>
-                                            <option value="Google Display">Google Display</option>
-                                            <option value="Google Video">Google Video</option>
-                                        </select>
-                                        <input
-                                            type="number"
-                                            placeholder="Objetivo total (leads)"
-                                            value={formData.objective}
-                                            onChange={(e) => setFormData({...formData, objective: e.target.value})}
-                                            className="px-4 py-2 border border-gray-300 rounded-lg"
-                                        />
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="CPL Planificado (USD)"
-                                            value={formData.plannedCPL}
-                                            onChange={(e) => setFormData({...formData, plannedCPL: e.target.value})}
-                                            className="px-4 py-2 border border-gray-300 rounded-lg"
-                                        />
-                                    </div>
-                                    <div className="flex gap-2 mt-4">
-                                        <button
-                                            onClick={handleAddCampaign}
-                                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-                                        >
-                                            Agregar Campaña
-                                        </button>
-                                        <button
-                                            onClick={() => setShowForm(false)}
-                                            className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition"
-                                        >
-                                            Cancelar
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {campaigns.length > 0 ? (
-                                <div className="space-y-2">
-                                    {getFilteredCampaigns().map(campaign => (
-                                        <div key={campaign.id} className="bg-gray-50 rounded-lg p-4 flex justify-between items-center">
-                                            {editingCampaign?.id === campaign.id ? (
-                                                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={editingCampaign.name}
-                                                        onChange={(e) => setEditingCampaign({...editingCampaign, name: e.target.value})}
-                                                        className="px-3 py-1 border border-gray-300 rounded"
-                                                    />
-                                                    <select
-                                                        value={editingCampaign.platform}
-                                                        onChange={(e) => setEditingCampaign({...editingCampaign, platform: e.target.value})}
-                                                        className="px-3 py-1 border border-gray-300 rounded bg-white"
-                                                    >
-                                                        <option value="Meta">Meta</option>
-                                                        <option value="Google PMAX">Google PMAX</option>
-                                                        <option value="Google Búsqueda">Google Búsqueda</option>
-                                                        <option value="Google Display">Google Display</option>
-                                                        <option value="Google Video">Google Video</option>
-                                                    </select>
-                                                    <input
-                                                        type="number"
-                                                        value={editingCampaign.objective}
-                                                        onChange={(e) => setEditingCampaign({...editingCampaign, objective: e.target.value})}
-                                                        className="px-3 py-1 border border-gray-300 rounded"
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={editingCampaign.plannedCPL}
-                                                        onChange={(e) => setEditingCampaign({...editingCampaign, plannedCPL: e.target.value})}
-                                                        className="px-3 py-1 border border-gray-300 rounded"
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-semibold text-gray-800">{campaign.name}</span>
-                                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
-                                                            {campaign.platform}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-sm text-gray-600 mt-1">
-                                                        Objetivo: {campaign.objective} leads | CPL: ${campaign.plannedCPL || 'N/A'}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            <div className="flex gap-2">
-                                                {editingCampaign?.id === campaign.id ? (
-                                                    <>
-                                                        <button
-                                                            onClick={handleEditCampaign}
-                                                            className="text-green-600 hover:text-green-700"
-                                                        >
-                                                            <Save />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setEditingCampaign(null)}
-                                                            className="text-gray-600 hover:text-gray-700"
-                                                        >
-                                                            <X />
-                                                        </button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <button
-                                                            onClick={() => setEditingCampaign({...campaign})}
-                                                            className="text-blue-600 hover:text-blue-700"
-                                                        >
-                                                            <Edit2 />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteCampaign(campaign.id)}
-                                                            className="text-red-500 hover:text-red-700"
-                                                        >
-                                                            <Trash2 />
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-center text-gray-500 py-8">
-                                    No hay campañas configuradas. Agrega tu primera campaña para comenzar.
-                                </div>
-                            )}
+                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-4 text-white">
+                            <div className="text-sm opacity-90">Progreso Mensual</div>
+                            <div className="text-3xl font-bold">{getMonthlyStats().progress}%</div>
+                            <div className="text-sm opacity-90">del objetivo</div>
                         </div>
-
-                        <div className="text-center text-gray-600 text-sm mt-8">
-                            <p>Status Campañas Viamar © 2025</p>
+                        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-4 text-white">
+                            <div className="text-sm opacity-90">CPL Promedio</div>
+                            <div className="text-3xl font-bold">${getMonthlyStats().avgCPL}</div>
+                            <div className="text-sm opacity-90">por lead</div>
                         </div>
                     </div>
-                </div>
-            );
-        };
 
-        ReactDOM.render(<CampaignStatusTracker />, document.getElementById('root'));
+                    {campaigns.length > 0 && (
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm font-semibold text-gray-700">Mostrar campaña:</label>
+                            <select value={selectedCampaign} onChange={(e) => setSelectedCampaign(e.target.value)} className="bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm">
+                                <option value="all">Todas</option>
+                                {campaigns.map(c => <option key={c.id} value={c.id}>{c.name} - {c.platform}</option>)}
+                            </select>
+                        </div>
+                    )}
+                </div>
+
+                <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-2xl font-bold text-gray-800">Mis Campañas</h2>
+                        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                            <Plus />Nueva Campaña
+                        </button>
+                    </div>
+
+                    {showForm && (
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input type="text" placeholder="Nombre" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="px-4 py-2 border rounded-lg"/>
+                                <select value={formData.platform} onChange={(e) => setFormData({...formData, platform: e.target.value})} className="px-4 py-2 border rounded-lg">
+                                    <option value="">Plataforma</option>
+                                    <option value="Meta">Meta</option>
+                                    <option value="Google PMAX">Google PMAX</option>
+                                    <option value="Google Búsqueda">Google Búsqueda</option>
+                                </select>
+                                <input type="number" placeholder="Objetivo" value={formData.objective} onChange={(e) => setFormData({...formData, objective: e.target.value})} className="px-4 py-2 border rounded-lg"/>
+                                <input type="number" step="0.01" placeholder="CPL USD" value={formData.plannedCPL} onChange={(e) => setFormData({...formData, plannedCPL: e.target.value})} className="px-4 py-2 border rounded-lg"/>
+                            </div>
+                            <div className="flex gap-2 mt-4">
+                                <button onClick={handleAddCampaign} className="bg-blue-600 text-white px-6 py-2 rounded-lg">Agregar</button>
+                                <button onClick={() => setShowForm(false)} className="bg-gray-300 px-6 py-2 rounded-lg">Cancelar</button>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="space-y-2">
+                        {getFilteredCampaigns().map(c => (
+                            <div key={c.id} className="bg-gray-50 rounded-lg p-4 flex justify-between items-center">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-semibold">{c.name}</span>
+                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
+                                    </div>
+                                    <div className="text-sm text-gray-600">Objetivo: {c.objective} | CPL: ${c.plannedCPL || 'N/A'}</div>
+                                </div>
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="text-red-500"><Trash2 /></button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {campaigns.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-4">
+                                <h2 className="text-2xl font-bold">Actualización</h2>
+                                <input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="px-3 py-1 border rounded-lg"/>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={copyToClipboard} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg"><Copy />Copiar</button>
+                                <button onClick={handleSaveDailyStatus} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg"><Save />Guardar</button>
+                            </div>
+                        </div>
+
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-semibold">Selecciona campañas:</h3>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setSelectedUpdateCampaigns(campaigns.map(c => c.id.toString()))} className="text-sm px-3 py-1 bg-blue-600 text-white rounded">Todas</button>
+                                    <button onClick={() => setSelectedUpdateCampaigns([])} className="text-sm px-3 py-1 bg-gray-300 rounded">Ninguna</button>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                {campaigns.map(c => (
+                                    <label key={c.id} className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${selectedUpdateCampaigns.includes(c.id.toString()) ? 'bg-blue-100 border-2 border-blue-500' : 'bg-white border-2 border-gray-200'}`}>
+                                        <input type="checkbox" checked={selectedUpdateCampaigns.includes(c.id.toString())} onChange={() => toggleCampaignSelection(c.id)} className="w-4 h-4"/>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-medium text-sm truncate">{c.name}</div>
+                                            <div className="text-xs text-gray-500">{c.platform}</div>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {getUpdateCampaigns().map(c => (
+                                <div key={c.id} className="border rounded-lg p-4">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <h3 className="font-semibold text-lg">{c.name}</h3>
+                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <input type="number" placeholder="Leads" value={todayStatus[c.id]?.currentLeads || ''} onChange={(e) => handleStatusChange(c.id, 'currentLeads', e.target.value)} className="px-3 py-2 border rounded-lg"/>
+                                        <input type="number" step="0.01" placeholder="CPL USD" value={todayStatus[c.id]?.currentCPL || ''} onChange={(e) => handleStatusChange(c.id, 'currentCPL', e.target.value)} className="px-3 py-2 border rounded-lg"/>
+                                        <input type="text" placeholder="Comentario" value={todayStatus[c.id]?.comment || ''} onChange={(e) => handleStatusChange(c.id, 'comment', e.target.value)} className="px-3 py-2 border rounded-lg"/>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="bg-gray-50 rounded-lg p-4 mt-6">
+                            <h3 className="font-semibold text-lg mb-3">Preview</h3>
+                            <pre className="whitespace-pre-wrap text-sm bg-white p-4 rounded border">{generateMessage()}</pre>
+                        </div>
+                    </div>
+                )}
+
+                {dailyUpdates.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <h2 className="text-2xl font-bold mb-4">Historial</h2>
+                        
+                        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <select value={historyFilterPlatform} onChange={(e) => setHistoryFilterPlatform(e.target.value)} className="px-3 py-2 border rounded-lg">
+                                    <option value="all">Todas las plataformas</option>
+                                    {getUniquePlatforms().map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                                <input type="date" value={historyFilterDateFrom} onChange={(e) => setHistoryFilterDateFrom(e.target.value)} className="px-3 py-2 border rounded-lg" placeholder="Desde"/>
+                                <input type="date" value={historyFilterDateTo} onChange={(e) => setHistoryFilterDateTo(e.target.value)} className="px-3 py-2 border rounded-lg" placeholder="Hasta"/>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {getFilteredHistory().map(u => {
+                                const tl = u.campaigns.reduce((s, c) => s + (parseInt(c.currentLeads) || 0), 0);
+                                const to = u.campaigns.reduce((s, c) => s + (parseInt(c.objective) || 0), 0);
+                                const p = to > 0 ? ((tl / to) * 100).toFixed(1) : 0;
+                                
+                                return (
+                                    <div key={u.date} className="border-2 rounded-xl p-5 bg-gradient-to-r from-white to-gray-50">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <Calendar />
+                                                    <span className="font-bold text-xl">{new Date(u.date).toLocaleDateString('es-ES', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</span>
+                                                </div>
+                                                <div className="flex gap-4 text-sm">
+                                                    <span>{u.campaigns.length} campañas</span>
+                                                    <span>Total: <strong className="text-blue-600">{tl}</strong> de {to}</span>
+                                                    <span>Progreso: <strong className="text-green-600">{p}%</strong></span>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => loadUpdate(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 /></button>
+                                                <button onClick={() => deleteUpdate(u.date)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 /></button>
+                                            </div>
+                                        </div>
+
+                                        <div className="mb-4">
+                                            <div className="w-full bg-gray-200 rounded-full h-3">
+                                                <div className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full" style={{width: `${Math.min(p, 100)}%`}}></div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {u.campaigns.map((c, i) => {
+                                                const cp = c.objective > 0 ? ((parseInt(c.currentLeads) || 0) / parseInt(c.objective) * 100).toFixed(0) : 0;
+                                                return (
+                                                    <div key={i} className="bg-white rounded-lg p-4 border hover:border-blue-300 shadow-sm">
+                                                        <div className="flex justify-between mb-2">
+                                                            <div className="flex-1">
+                                                                <div className="font-semibold truncate">{c.name}</div>
+                                                                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
+                                                            </div>
+                                                            <div className="text-2xl font-bold text-blue-600">{cp}%</div>
+                                                        </div>
+                                                        {c.currentLeads && (
+                                                            <div className="mt-3">
+                                                                <div className="flex justify-between text-sm mb-1">
+                                                                    <span>Leads</span>
+                                                                    <span className="font-semibold">{c.currentLeads}/{c.objective}</span>
+                                                                </div>
+                                                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                    <div className="bg-blue-500 h-2 rounded-full" style={{width: `${Math.min(cp, 100)}%`}}></div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {c.currentCPL && <div className="mt-2 text-sm flex justify-between"><span>CPL:</span><span className="font-semibold text-green-600">${c.currentCPL}</span></div>}
+                                                        {c.comment && <div className="mt-2 pt-2 border-t text-xs text-gray-600 italic">{c.comment}</div>}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 </body>
 </html>
