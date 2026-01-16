@@ -16,6 +16,7 @@
     <script type="text/babel">
 const { useState, useEffect } = React;
 
+// Configurar Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyCdH7SDkxWHKRnCIiueEkr5PUOOqmZO_1k",
   authDomain: "campanas-viamar.firebaseapp.com",
@@ -28,20 +29,10 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-const META_ACCESS_TOKEN = "EAAY4pN4kBlEBQZAKSAitmKu2i0uYMc4LYbrJbG2mMDbQx0xEjN4elvfnzrIx5Sz0ZBZB0ePoZBFsydx5e6R0YnOLpRDVtVV7DiHZCX9bUd89cAIjZCQJZAC0Aa42Hxrg8ZAHPu0hY9ddoso0kfffWTlLdr1w1oW9UjOHW323eQgyTBJJ6xcGztjMqxjSH8QN10l6EWfM3W3TrPDpZAYbjTdflxrMmSuPp6AZAQT5vDyS1Dge3ymt9lgiOQXjcGGbeauQGtlsDhUV6JwhOJbzkRqlvF";
-const AD_ACCOUNTS = [
-  'act_912401480912956',
-  'act_218541403183890',
-  'act_1247091749952818',
-  'act_878218544198259',
-  'act_859717728933430',
-  'act_405779189010638'
-];
-
-const RefreshCw = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>;
+// Iconos
 const Plus = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>;
 const Copy = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
-const Save = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/></svg>;
+const Save = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
 const Calendar = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
 const Trash2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>;
 const Edit2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>;
@@ -55,15 +46,15 @@ const App = () => {
     const [todayStatus, setTodayStatus] = useState({});
     const [updateDate, setUpdateDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedCampaign, setSelectedCampaign] = useState('all');
-    const [selectedUpdateCampaign, setSelectedUpdateCampaign] = useState('all');
+    const [selectedUpdateCampaigns, setSelectedUpdateCampaigns] = useState([]);
     const [historyFilterPlatform, setHistoryFilterPlatform] = useState('all');
     const [historyFilterDateFrom, setHistoryFilterDateFrom] = useState('');
     const [historyFilterDateTo, setHistoryFilterDateTo] = useState('');
     const [selectedMonth, setSelectedMonth] = useState('2025-12');
     const [formData, setFormData] = useState({ name: '', platform: '', objective: '', plannedCPL: '' });
     const [loading, setLoading] = useState(true);
-    const [syncing, setSyncing] = useState(false);
 
+    // Cargar datos desde Firebase
     useEffect(() => {
         const unsubscribeCampaigns = db.collection('campaigns').onSnapshot(snapshot => {
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -82,72 +73,11 @@ const App = () => {
         };
     }, []);
 
-    const syncMetaData = async (campaignId) => {
-        const campaign = campaigns.find(c => c.id === campaignId);
-        if (!campaign) return;
-
-        setSyncing(true);
-        try {
-            const brandName = campaign.name.split('-')[0].trim();
-            
-            let totalResults = 0;
-            let totalSpend = 0;
-            let totalImpressions = 0;
-            let totalClicks = 0;
-            let totalReach = 0;
-
-            for (const accountId of AD_ACCOUNTS) {
-                try {
-                    const today = new Date().toISOString().split('T')[0];
-                    const url = `https://graph.facebook.com/v18.0/${accountId}/campaigns?fields=name,insights.date_preset(today){results,spend,impressions,clicks,reach}&access_token=${META_ACCESS_TOKEN}`;
-                    
-                    const response = await fetch(url);
-                    const data = await response.json();
-                    
-                    if (data.data) {
-                        data.data.forEach(metaCampaign => {
-                            if (metaCampaign.name.toLowerCase().includes(brandName.toLowerCase())) {
-                                if (metaCampaign.insights && metaCampaign.insights.data[0]) {
-                                    const insights = metaCampaign.insights.data[0];
-                                    totalResults += parseInt(insights.results || 0);
-                                    totalSpend += parseFloat(insights.spend || 0);
-                                    totalImpressions += parseInt(insights.impressions || 0);
-                                    totalClicks += parseInt(insights.clicks || 0);
-                                    totalReach += parseInt(insights.reach || 0);
-                                }
-                            }
-                        });
-                    }
-                } catch (error) {
-                    console.error(`Error en cuenta ${accountId}:`, error);
-                }
-            }
-
-            const cpl = totalResults > 0 ? (totalSpend / totalResults).toFixed(2) : '0';
-            const ctr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : '0';
-
-            setTodayStatus({
-                ...todayStatus,
-                [campaignId]: {
-                    ...todayStatus[campaignId],
-                    currentLeads: totalResults.toString(),
-                    currentCPL: cpl,
-                    spend: totalSpend.toFixed(2),
-                    impressions: totalImpressions.toString(),
-                    clicks: totalClicks.toString(),
-                    ctr: ctr,
-                    reach: totalReach.toString()
-                }
-            });
-
-            alert(`✅ Datos sincronizados: ${totalResults} leads, $${cpl} CPL`);
-        } catch (error) {
-            console.error('Error sincronizando:', error);
-            alert('❌ Error al sincronizar. Verifica el token de Meta.');
-        } finally {
-            setSyncing(false);
+    useEffect(() => {
+        if (campaigns.length > 0 && selectedUpdateCampaigns.length === 0) {
+            setSelectedUpdateCampaigns(campaigns.map(c => c.id.toString()));
         }
-    };
+    }, [campaigns]);
 
     const handleAddCampaign = async () => {
         if (formData.name && formData.objective && formData.platform) {
@@ -157,6 +87,18 @@ const App = () => {
             });
             setFormData({ name: '', platform: '', objective: '', plannedCPL: '' });
             setShowForm(false);
+        }
+    };
+
+    const handleEditCampaign = async () => {
+        if (editingCampaign) {
+            await db.collection('campaigns').doc(editingCampaign.id).update({
+                name: editingCampaign.name,
+                platform: editingCampaign.platform,
+                objective: editingCampaign.objective,
+                plannedCPL: editingCampaign.plannedCPL
+            });
+            setEditingCampaign(null);
         }
     };
 
@@ -171,22 +113,13 @@ const App = () => {
     };
 
     const handleSaveDailyStatus = async () => {
-        const selectedCampaigns = selectedUpdateCampaign === 'all' 
-            ? campaigns 
-            : campaigns.filter(c => c.id === selectedUpdateCampaign);
-
-        const hasData = selectedCampaigns.some(c => 
-            todayStatus[c.id]?.currentLeads || todayStatus[c.id]?.comment
-        );
-
+        const hasData = Object.keys(todayStatus).some(id => todayStatus[id]?.currentLeads || todayStatus[id]?.currentCPL || todayStatus[id]?.comment);
         if (!hasData) return alert('Agrega datos');
 
-        const existing = await db.collection('dailyUpdates').where('date', '==', updateDate).get();
-        
         const entry = {
             date: updateDate,
             datetime: firebase.firestore.FieldValue.serverTimestamp(),
-            campaigns: selectedCampaigns.map(c => ({
+            campaigns: campaigns.map(c => ({
                 campaignId: c.id,
                 name: c.name,
                 platform: c.platform,
@@ -194,18 +127,18 @@ const App = () => {
                 plannedCPL: c.plannedCPL,
                 currentLeads: todayStatus[c.id]?.currentLeads || '',
                 currentCPL: todayStatus[c.id]?.currentCPL || '',
-                spend: todayStatus[c.id]?.spend || '',
-                impressions: todayStatus[c.id]?.impressions || '',
-                clicks: todayStatus[c.id]?.clicks || '',
-                ctr: todayStatus[c.id]?.ctr || '',
-                reach: todayStatus[c.id]?.reach || '',
                 comment: todayStatus[c.id]?.comment || ''
-            })).filter(c => c.currentLeads || c.comment)
+            })).filter(c => c.currentLeads || c.currentCPL || c.comment)
         };
 
+        // Verificar si existe un update para esta fecha
+        const existing = await db.collection('dailyUpdates').where('date', '==', updateDate).get();
+        
         if (!existing.empty) {
+            // Actualizar existente
             await db.collection('dailyUpdates').doc(existing.docs[0].id).update(entry);
         } else {
+            // Crear nuevo
             await db.collection('dailyUpdates').add(entry);
         }
 
@@ -215,27 +148,18 @@ const App = () => {
 
     const generateMessage = () => {
         const date = new Date(updateDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-        const selectedCampaigns = selectedUpdateCampaign === 'all' 
-            ? campaigns 
-            : campaigns.filter(c => c.id === selectedUpdateCampaign);
+        const cams = getUpdateCampaigns().filter(c => todayStatus[c.id]?.currentLeads || todayStatus[c.id]?.currentCPL || todayStatus[c.id]?.comment);
+        if (cams.length === 0) return '(Sin datos)';
         
-        const camsWithData = selectedCampaigns.filter(c => todayStatus[c.id]?.currentLeads);
-        if (camsWithData.length === 0) return '(Sin datos)';
-        
-        return camsWithData.map((c) => {
+        return cams.map((c) => {
             const s = todayStatus[c.id] || {};
             let m = `Resumen campaña ${c.name}`;
             if (c.platform) m += ` - ${c.platform}`;
             m += ` - con corte a ${date}\n\n`;
             m += `* Objetivo: ${c.objective} leads\n`;
             if (c.plannedCPL) m += `* CPL planificado: ${c.plannedCPL} USD\n`;
-            if (s.currentLeads) m += `* Leads: ${s.currentLeads}\n`;
-            if (s.currentCPL) m += `* CPL actual: $${s.currentCPL}\n`;
-            if (s.spend) m += `* Gasto: $${s.spend}\n`;
-            if (s.impressions) m += `* Impresiones: ${s.impressions}\n`;
-            if (s.clicks) m += `* Clicks: ${s.clicks}\n`;
-            if (s.ctr) m += `* CTR: ${s.ctr}%\n`;
-            if (s.reach) m += `* Alcance: ${s.reach}\n`;
+            if (s.currentLeads) m += `* Avance: ${s.currentLeads} leads\n`;
+            if (s.currentCPL) m += `* CPL actual: ${s.currentCPL} USD\n`;
             if (s.comment) m += `Comentario: ${s.comment}`;
             return m;
         }).join('\n\n');
@@ -249,6 +173,23 @@ const App = () => {
     };
 
     const getFilteredCampaigns = () => selectedCampaign === 'all' ? campaigns : campaigns.filter(c => c.id === selectedCampaign);
+    const getUpdateCampaigns = () => selectedUpdateCampaigns.length === 0 ? campaigns : campaigns.filter(c => selectedUpdateCampaigns.includes(c.id));
+    
+    const toggleCampaignSelection = (id) => {
+        setSelectedUpdateCampaigns(selectedUpdateCampaigns.includes(id) ? selectedUpdateCampaigns.filter(x => x !== id) : [...selectedUpdateCampaigns, id]);
+    };
+
+    const getFilteredHistory = () => {
+        let f = [...dailyUpdates];
+        if (historyFilterPlatform !== 'all') {
+            f = f.map(u => ({ ...u, campaigns: u.campaigns.filter(c => c.platform === historyFilterPlatform) })).filter(u => u.campaigns.length > 0);
+        }
+        if (historyFilterDateFrom) f = f.filter(u => u.date >= historyFilterDateFrom);
+        if (historyFilterDateTo) f = f.filter(u => u.date <= historyFilterDateTo);
+        return f;
+    };
+
+    const getUniquePlatforms = () => Array.from(new Set(campaigns.map(c => c.platform)));
 
     const getMonthlyStats = () => {
         const m = dailyUpdates.filter(u => u.date.startsWith(selectedMonth));
@@ -272,6 +213,23 @@ const App = () => {
         };
     };
 
+    const deleteUpdate = async (id) => {
+        if (confirm('¿Eliminar?')) {
+            await db.collection('dailyUpdates').doc(id).delete();
+        }
+    };
+
+    const loadUpdate = (u) => {
+        const s = {};
+        u.campaigns.forEach(c => {
+            s[c.campaignId] = { currentLeads: c.currentLeads, currentCPL: c.currentCPL, comment: c.comment };
+        });
+        setTodayStatus(s);
+        setUpdateDate(u.date);
+        alert('Cargado');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -289,7 +247,7 @@ const App = () => {
                 <div className="text-center mb-6">
                     <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-2">STATUS CAMPAÑAS VIAMAR</h1>
                     <div className="h-1 w-32 mx-auto bg-gradient-to-r from-blue-600 to-purple-600 rounded-full"></div>
-                    <div className="mt-2 text-sm text-green-600 font-semibold">🔄 Datos compartidos • 🔗 Integración Meta Ads</div>
+                    <div className="mt-2 text-sm text-green-600 font-semibold">🔄 Datos compartidos en tiempo real</div>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
@@ -323,6 +281,8 @@ const App = () => {
                             <div className="text-sm opacity-90">por lead</div>
                         </div>
                     </div>
+
+
                 </div>
 
                 <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
@@ -336,12 +296,14 @@ const App = () => {
                     {showForm && (
                         <div className="bg-gray-50 rounded-lg p-4 mb-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <input type="text" placeholder="Nombre (ej: Starrey - Meta)" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="px-4 py-2 border rounded-lg"/>
+                                <input type="text" placeholder="Nombre" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="px-4 py-2 border rounded-lg"/>
                                 <select value={formData.platform} onChange={(e) => setFormData({...formData, platform: e.target.value})} className="px-4 py-2 border rounded-lg">
                                     <option value="">Plataforma</option>
                                     <option value="Meta">Meta</option>
                                     <option value="Google PMAX">Google PMAX</option>
                                     <option value="Google Búsqueda">Google Búsqueda</option>
+                                    <option value="Google Display">Google Display</option>
+                                    <option value="Google Video">Google Video</option>
                                 </select>
                                 <input type="number" placeholder="Objetivo" value={formData.objective} onChange={(e) => setFormData({...formData, objective: e.target.value})} className="px-4 py-2 border rounded-lg"/>
                                 <input type="number" step="0.01" placeholder="CPL USD" value={formData.plannedCPL} onChange={(e) => setFormData({...formData, plannedCPL: e.target.value})} className="px-4 py-2 border rounded-lg"/>
@@ -353,29 +315,61 @@ const App = () => {
                         </div>
                     )}
 
-                    {campaigns.length > 0 && (
-                        <div className="mb-4">
-                            <select value={selectedCampaign} onChange={(e) => setSelectedCampaign(e.target.value)} className="w-full px-4 py-2 border rounded-lg">
-                                <option value="all">Todas las campañas ({campaigns.length})</option>
-                                {campaigns.map(c => <option key={c.id} value={c.id}>{c.name} - {c.platform}</option>)}
-                            </select>
+                    {campaigns.length > 0 ? (
+                        <div>
+                            <div className="mb-4 flex items-center gap-3">
+                                <label className="text-sm font-semibold text-gray-700">Ver campaña:</label>
+                                <select value={selectedCampaign} onChange={(e) => setSelectedCampaign(e.target.value)} className="flex-1 bg-white border border-gray-300 rounded-lg px-4 py-2">
+                                    <option value="all">Todas las campañas ({campaigns.length})</option>
+                                    {campaigns.map(c => <option key={c.id} value={c.id}>{c.name} - {c.platform}</option>)}
+                                </select>
+                            </div>
+                            
+                            <div className="space-y-2">
+                                {getFilteredCampaigns().map(c => (
+                                    <div key={c.id} className="bg-gray-50 rounded-lg p-4 flex justify-between items-center">
+                                        {editingCampaign?.id === c.id ? (
+                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-2">
+                                                <input type="text" value={editingCampaign.name} onChange={(e) => setEditingCampaign({...editingCampaign, name: e.target.value})} className="px-3 py-1 border rounded"/>
+                                                <select value={editingCampaign.platform} onChange={(e) => setEditingCampaign({...editingCampaign, platform: e.target.value})} className="px-3 py-1 border rounded">
+                                                    <option value="Meta">Meta</option>
+                                                    <option value="Google PMAX">Google PMAX</option>
+                                                    <option value="Google Búsqueda">Google Búsqueda</option>
+                                                </select>
+                                                <input type="number" value={editingCampaign.objective} onChange={(e) => setEditingCampaign({...editingCampaign, objective: e.target.value})} className="px-3 py-1 border rounded"/>
+                                                <input type="number" step="0.01" value={editingCampaign.plannedCPL} onChange={(e) => setEditingCampaign({...editingCampaign, plannedCPL: e.target.value})} className="px-3 py-1 border rounded"/>
+                                            </div>
+                                        ) : (
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-semibold">{c.name}</span>
+                                                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
+                                                </div>
+                                                <div className="text-sm text-gray-600">Objetivo: {c.objective} | CPL: ${c.plannedCPL || 'N/A'}</div>
+                                            </div>
+                                        )}
+                                        <div className="flex gap-2">
+                                            {editingCampaign?.id === c.id ? (
+                                                <>
+                                                    <button onClick={handleEditCampaign} className="text-green-600"><Save /></button>
+                                                    <button onClick={() => setEditingCampaign(null)} className="text-gray-600"><X /></button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <button onClick={() => setEditingCampaign(c)} className="text-blue-600"><Edit2 /></button>
+                                                    <button onClick={() => handleDeleteCampaign(c.id)} className="text-red-500"><Trash2 /></button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center text-gray-500 py-8">
+                            No hay campañas configuradas. Agrega tu primera campaña para comenzar.
                         </div>
                     )}
-
-                    <div className="space-y-2">
-                        {getFilteredCampaigns().map(c => (
-                            <div key={c.id} className="bg-gray-50 rounded-lg p-4 flex justify-between items-center">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-semibold">{c.name}</span>
-                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
-                                    </div>
-                                    <div className="text-sm text-gray-600">Objetivo: {c.objective} | CPL: ${c.plannedCPL || 'N/A'}</div>
-                                </div>
-                                <button onClick={() => handleDeleteCampaign(c.id)} className="text-red-500"><Trash2 /></button>
-                            </div>
-                        ))}
-                    </div>
                 </div>
 
                 {campaigns.length > 0 && (
@@ -391,50 +385,133 @@ const App = () => {
                             </div>
                         </div>
 
-                        <div className="mb-4">
-                            <label className="font-semibold text-gray-700 mb-2 block">Selecciona campaña:</label>
-                            <select value={selectedUpdateCampaign} onChange={(e) => setSelectedUpdateCampaign(e.target.value)} className="w-full px-4 py-2 border rounded-lg">
-                                <option value="all">Todas las campañas</option>
-                                {campaigns.map(c => <option key={c.id} value={c.id}>{c.name} - {c.platform}</option>)}
-                            </select>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                            <div className="flex items-center gap-4">
+                                <label className="font-semibold text-gray-700">Selecciona campaña a actualizar:</label>
+                                <select 
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === 'all') {
+                                            setSelectedUpdateCampaigns(campaigns.map(c => c.id));
+                                        } else if (val === 'none') {
+                                            setSelectedUpdateCampaigns([]);
+                                        } else {
+                                            setSelectedUpdateCampaigns([val]);
+                                        }
+                                    }}
+                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-white"
+                                >
+                                    <option value="all">Todas las campañas</option>
+                                    <option value="none">Ninguna</option>
+                                    {campaigns.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name} - {c.platform}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
-                        {(selectedUpdateCampaign === 'all' ? campaigns : campaigns.filter(c => c.id === selectedUpdateCampaign)).map(c => (
-                            <div key={c.id} className="border rounded-lg p-4 mb-4">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-2">
+                        <div className="space-y-4">
+                            {getUpdateCampaigns().map(c => (
+                                <div key={c.id} className="border rounded-lg p-4">
+                                    <div className="flex items-center gap-2 mb-3">
                                         <h3 className="font-semibold text-lg">{c.name}</h3>
                                         <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
                                     </div>
-                                    {c.platform === 'Meta' && (
-                                        <button 
-                                            onClick={() => syncMetaData(c.id)} 
-                                            disabled={syncing}
-                                            className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
-                                        >
-                                            <RefreshCw />
-                                            {syncing ? 'Sincronizando...' : 'Sincronizar Meta'}
-                                        </button>
-                                    )}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <input type="number" placeholder="Leads" value={todayStatus[c.id]?.currentLeads || ''} onChange={(e) => handleStatusChange(c.id, 'currentLeads', e.target.value)} className="px-3 py-2 border rounded-lg"/>
+                                        <input type="number" step="0.01" placeholder="CPL USD" value={todayStatus[c.id]?.currentCPL || ''} onChange={(e) => handleStatusChange(c.id, 'currentCPL', e.target.value)} className="px-3 py-2 border rounded-lg"/>
+                                        <input type="text" placeholder="Comentario" value={todayStatus[c.id]?.comment || ''} onChange={(e) => handleStatusChange(c.id, 'comment', e.target.value)} className="px-3 py-2 border rounded-lg"/>
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-                                    <input type="number" placeholder="Leads" value={todayStatus[c.id]?.currentLeads || ''} onChange={(e) => handleStatusChange(c.id, 'currentLeads', e.target.value)} className="px-3 py-2 border rounded-lg"/>
-                                    <input type="number" step="0.01" placeholder="CPL USD" value={todayStatus[c.id]?.currentCPL || ''} onChange={(e) => handleStatusChange(c.id, 'currentCPL', e.target.value)} className="px-3 py-2 border rounded-lg"/>
-                                    <input type="number" step="0.01" placeholder="Gasto USD" value={todayStatus[c.id]?.spend || ''} onChange={(e) => handleStatusChange(c.id, 'spend', e.target.value)} className="px-3 py-2 border rounded-lg"/>
-                                    <input type="number" placeholder="Impresiones" value={todayStatus[c.id]?.impressions || ''} onChange={(e) => handleStatusChange(c.id, 'impressions', e.target.value)} className="px-3 py-2 border rounded-lg"/>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                    <input type="number" placeholder="Clicks" value={todayStatus[c.id]?.clicks || ''} onChange={(e) => handleStatusChange(c.id, 'clicks', e.target.value)} className="px-3 py-2 border rounded-lg"/>
-                                    <input type="number" step="0.01" placeholder="CTR %" value={todayStatus[c.id]?.ctr || ''} onChange={(e) => handleStatusChange(c.id, 'ctr', e.target.value)} className="px-3 py-2 border rounded-lg"/>
-                                    <input type="number" placeholder="Alcance" value={todayStatus[c.id]?.reach || ''} onChange={(e) => handleStatusChange(c.id, 'reach', e.target.value)} className="px-3 py-2 border rounded-lg"/>
-                                    <input type="text" placeholder="Comentario" value={todayStatus[c.id]?.comment || ''} onChange={(e) => handleStatusChange(c.id, 'comment', e.target.value)} className="px-3 py-2 border rounded-lg"/>
-                                </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
 
                         <div className="bg-gray-50 rounded-lg p-4 mt-6">
                             <h3 className="font-semibold text-lg mb-3">Preview</h3>
                             <pre className="whitespace-pre-wrap text-sm bg-white p-4 rounded border">{generateMessage()}</pre>
+                        </div>
+                    </div>
+                )}
+
+                {dailyUpdates.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <h2 className="text-2xl font-bold mb-4">Historial</h2>
+                        
+                        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <select value={historyFilterPlatform} onChange={(e) => setHistoryFilterPlatform(e.target.value)} className="px-3 py-2 border rounded-lg">
+                                    <option value="all">Todas las plataformas</option>
+                                    {getUniquePlatforms().map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                                <input type="date" value={historyFilterDateFrom} onChange={(e) => setHistoryFilterDateFrom(e.target.value)} className="px-3 py-2 border rounded-lg" placeholder="Desde"/>
+                                <input type="date" value={historyFilterDateTo} onChange={(e) => setHistoryFilterDateTo(e.target.value)} className="px-3 py-2 border rounded-lg" placeholder="Hasta"/>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {getFilteredHistory().map(u => {
+                                const tl = u.campaigns.reduce((s, c) => s + (parseInt(c.currentLeads) || 0), 0);
+                                const to = u.campaigns.reduce((s, c) => s + (parseInt(c.objective) || 0), 0);
+                                const p = to > 0 ? ((tl / to) * 100).toFixed(1) : 0;
+                                
+                                return (
+                                    <div key={u.id} className="border-2 rounded-xl p-5 bg-gradient-to-r from-white to-gray-50">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <Calendar />
+                                                    <span className="font-bold text-xl">{new Date(u.date).toLocaleDateString('es-ES', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</span>
+                                                </div>
+                                                <div className="flex gap-4 text-sm">
+                                                    <span>{u.campaigns.length} campañas</span>
+                                                    <span>Total: <strong className="text-blue-600">{tl}</strong> de {to}</span>
+                                                    <span>Progreso: <strong className="text-green-600">{p}%</strong></span>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => loadUpdate(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 /></button>
+                                                <button onClick={() => deleteUpdate(u.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 /></button>
+                                            </div>
+                                        </div>
+
+                                        <div className="mb-4">
+                                            <div className="w-full bg-gray-200 rounded-full h-3">
+                                                <div className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full" style={{width: `${Math.min(p, 100)}%`}}></div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {u.campaigns.map((c, i) => {
+                                                const cp = c.objective > 0 ? ((parseInt(c.currentLeads) || 0) / parseInt(c.objective) * 100).toFixed(0) : 0;
+                                                return (
+                                                    <div key={i} className="bg-white rounded-lg p-4 border hover:border-blue-300 shadow-sm">
+                                                        <div className="flex justify-between mb-2">
+                                                            <div className="flex-1">
+                                                                <div className="font-semibold truncate">{c.name}</div>
+                                                                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
+                                                            </div>
+                                                            <div className="text-2xl font-bold text-blue-600">{cp}%</div>
+                                                        </div>
+                                                        {c.currentLeads && (
+                                                            <div className="mt-3">
+                                                                <div className="flex justify-between text-sm mb-1">
+                                                                    <span>Leads</span>
+                                                                    <span className="font-semibold">{c.currentLeads}/{c.objective}</span>
+                                                                </div>
+                                                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                    <div className="bg-blue-500 h-2 rounded-full" style={{width: `${Math.min(cp, 100)}%`}}></div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {c.currentCPL && <div className="mt-2 text-sm flex justify-between"><span>CPL:</span><span className="font-semibold text-green-600">${c.currentCPL}</span></div>}
+                                                        {c.comment && <div className="mt-2 pt-2 border-t text-xs text-gray-600 italic">{c.comment}</div>}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 )}
