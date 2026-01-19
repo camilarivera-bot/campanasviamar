@@ -113,6 +113,7 @@ const App = () => {
         const hasData = Object.keys(todayStatus).some(id => todayStatus[id]?.currentLeads || todayStatus[id]?.currentCPL || todayStatus[id]?.comment);
         if (!hasData) return alert('❌ Agrega datos primero');
 
+        // Construir el array de campañas con datos
         const campaignsWithData = [];
         
         campaigns.forEach(c => {
@@ -136,22 +137,27 @@ const App = () => {
         }
 
         try {
+            // Buscar si ya existe un update para esta fecha
             const existing = await db.collection('dailyUpdates').where('date', '==', updateDate).get();
             
             if (!existing.empty) {
+                // Ya existe un registro - FUSIONAR las campañas
                 const existingDoc = existing.docs[0];
                 const existingData = existingDoc.data();
                 const existingCampaigns = existingData.campaigns || [];
                 
+                // Crear un mapa con las campañas existentes por campaignId
                 const campaignMap = {};
                 existingCampaigns.forEach(c => {
                     campaignMap[c.campaignId] = c;
                 });
                 
+                // Actualizar o agregar las nuevas campañas
                 campaignsWithData.forEach(c => {
-                    campaignMap[c.campaignId] = c;
+                    campaignMap[c.campaignId] = c; // Sobrescribe si existe, agrega si no
                 });
                 
+                // Convertir el mapa de vuelta a array
                 const mergedCampaigns = Object.values(campaignMap);
                 
                 const entry = {
@@ -163,6 +169,7 @@ const App = () => {
                 await db.collection('dailyUpdates').doc(existingDoc.id).update(entry);
                 alert(`✅ Actualización guardada\n${campaignsWithData.length} campaña(s) actualizada(s)\nTotal en el registro: ${mergedCampaigns.length} campañas\nFecha: ${updateDate}`);
             } else {
+                // Crear nuevo registro
                 const entry = {
                     date: updateDate,
                     datetime: firebase.firestore.FieldValue.serverTimestamp(),
@@ -173,6 +180,7 @@ const App = () => {
                 alert(`✅ Registro creado\n${campaignsWithData.length} campaña(s) guardada(s)\nFecha: ${updateDate}`);
             }
 
+            // Limpiar solo las campañas que se guardaron
             const newTodayStatus = {...todayStatus};
             campaignsWithData.forEach(c => {
                 delete newTodayStatus[c.campaignId];
@@ -233,6 +241,7 @@ const App = () => {
         const monthUpdates = dailyUpdates.filter(u => u.date && u.date.startsWith(selectedMonth));
         
         if (monthUpdates.length === 0) {
+            // Mostrar mensaje de debug si no hay datos
             return { 
                 totalLeads: 0, 
                 totalObjective: 0, 
@@ -242,6 +251,7 @@ const App = () => {
             };
         }
         
+        // Usar nombre de campaña como clave para agrupar
         const campaignTotals = {};
         
         monthUpdates.forEach(update => {
@@ -265,6 +275,7 @@ const App = () => {
                 const leads = parseInt(c.currentLeads) || 0;
                 const cpl = parseFloat(c.currentCPL) || 0;
                 
+                // Tomar el máximo de leads
                 if (leads > campaignTotals[key].maxLeads) {
                     campaignTotals[key].maxLeads = leads;
                     campaignTotals[key].lastCPL = cpl;
@@ -357,7 +368,7 @@ const App = () => {
                         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-4 text-white">
                             <div className="text-sm opacity-90">Objetivo del Mes</div>
                             <div className="text-3xl font-bold">{getMonthlyStats().totalObjective}</div>
-                            <div className="text-sm opacity-90">leads meta</div>
+                            <div className="text-sm opacity-90">leads</div>
                         </div>
                         <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-4 text-white">
                             <div className="text-sm opacity-90">Progreso Mensual</div>
