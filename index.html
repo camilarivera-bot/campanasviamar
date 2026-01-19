@@ -111,33 +111,85 @@ const App = () => {
 
     const handleSaveDailyStatus = async () => {
         const hasData = Object.keys(todayStatus).some(id => todayStatus[id]?.currentLeads || todayStatus[id]?.currentCPL || todayStatus[id]?.comment);
-        if (!hasData) return alert('Agrega datos');
+        if (!hasData) return alert('❌ Agrega datos primero');
 
-        const entry = {
-            date: updateDate,
-            datetime: firebase.firestore.FieldValue.serverTimestamp(),
-            campaigns: campaigns.map(c => ({
-                campaignId: c.id,
-                name: c.name,
-                platform: c.platform,
-                objective: c.objective,
-                plannedCPL: c.plannedCPL,
-                currentLeads: todayStatus[c.id]?.currentLeads || '',
-                currentCPL: todayStatus[c.id]?.currentCPL || '',
-                comment: todayStatus[c.id]?.comment || ''
-            })).filter(c => c.currentLeads || c.currentCPL || c.comment)
-        };
-
-        const existing = await db.collection('dailyUpdates').where('date', '==', updateDate).get();
+        // Construir el array de campañas con datos
+        const campaignsWithData = [];
         
-        if (!existing.empty) {
-            await db.collection('dailyUpdates').doc(existing.docs[0].id).update(entry);
-        } else {
-            await db.collection('dailyUpdates').add(entry);
+        campaigns.forEach(c => {
+            const status = todayStatus[c.id];
+            if (status && (status.currentLeads || status.currentCPL || status.comment)) {
+                campaignsWithData.push({
+                    campaignId: c.id,
+                    name: c.name,
+                    platform: c.platform,
+                    objective: c.objective,
+                    plannedCPL: c.plannedCPL,
+                    currentLeads: status.currentLeads || '',
+                    currentCPL: status.currentCPL || '',
+                    comment: status.comment || ''
+                });
+            }
+        });
+
+        if (campaignsWithData.length === 0) {
+            return alert('❌ No hay campañas con datos para guardar');
         }
 
-        setTodayStatus({});
-        alert('Guardado exitosamente');
+        try {
+            // Buscar si ya existe un update para esta fecha
+            const existing = await db.collection('dailyUpdates').where('date', '==', updateDate).get();
+            
+            if (!existing.empty) {
+                // Ya existe un registro - FUSIONAR las campañas
+                const existingDoc = existing.docs[0];
+                const existingData = existingDoc.data();
+                const existingCampaigns = existingData.campaigns || [];
+                
+                // Crear un mapa con las campañas existentes por campaignId
+                const campaignMap = {};
+                existingCampaigns.forEach(c => {
+                    campaignMap[c.campaignId] = c;
+                });
+                
+                // Actualizar o agregar las nuevas campañas
+                campaignsWithData.forEach(c => {
+                    campaignMap[c.campaignId] = c; // Sobrescribe si existe, agrega si no
+                });
+                
+                // Convertir el mapa de vuelta a array
+                const mergedCampaigns = Object.values(campaignMap);
+                
+                const entry = {
+                    date: updateDate,
+                    datetime: firebase.firestore.FieldValue.serverTimestamp(),
+                    campaigns: mergedCampaigns
+                };
+                
+                await db.collection('dailyUpdates').doc(existingDoc.id).update(entry);
+                alert(`✅ Actualización guardada\n${campaignsWithData.length} campaña(s) actualizada(s)\nTotal en el registro: ${mergedCampaigns.length} campañas\nFecha: ${updateDate}`);
+            } else {
+                // Crear nuevo registro
+                const entry = {
+                    date: updateDate,
+                    datetime: firebase.firestore.FieldValue.serverTimestamp(),
+                    campaigns: campaignsWithData
+                };
+                
+                await db.collection('dailyUpdates').add(entry);
+                alert(`✅ Registro creado\n${campaignsWithData.length} campaña(s) guardada(s)\nFecha: ${updateDate}`);
+            }
+
+            // Limpiar solo las campañas que se guardaron
+            const newTodayStatus = {...todayStatus};
+            campaignsWithData.forEach(c => {
+                delete newTodayStatus[c.campaignId];
+            });
+            setTodayStatus(newTodayStatus);
+            
+        } catch (error) {
+            alert(`❌ Error al guardar: ${error.message}`);
+        }
     };
 
     const generateMessage = () => {
@@ -188,14 +240,31 @@ const App = () => {
     const getMonthlyStats = () => {
         const monthUpdates = dailyUpdates.filter(u => u.date && u.date.startsWith(selectedMonth));
         
-        if (monthUpdates.length === 0) return { totalLeads: 0, totalObjective: 0, progress: 0, avgCPL: 0 };
+        if (monthUpdates.length === 0) {
+            // Mostrar mensaje de debug si no hay datos
+            return { 
+                totalLeads: 0, 
+                totalObjective: 0, 
+                progress: 0, 
+                avgCPL: 0,
+                debug: `No hay datos para ${selectedMonth}. Total de registros: ${dailyUpdates.length}`
+            };
+        }
         
+        // Usar nombre de campaña como clave para agrupar
         const campaignTotals = {};
         
         monthUpdates.forEach(update => {
+            if (!update.campaigns || !Array.isArray(update.campaigns)) {
+                return;
+            }
+            
             update.campaigns.forEach(c => {
-                if (!campaignTotals[c.campaignId]) {
-                    campaignTotals[c.campaignId] = {
+                const key = `${c.name}_${c.platform}`;
+                
+                if (!campaignTotals[key]) {
+                    campaignTotals[key] = {
+                        name: c.name,
                         maxLeads: 0,
                         objective: parseInt(c.objective) || 0,
                         totalSpend: 0,
@@ -206,9 +275,10 @@ const App = () => {
                 const leads = parseInt(c.currentLeads) || 0;
                 const cpl = parseFloat(c.currentCPL) || 0;
                 
-                if (leads > campaignTotals[c.campaignId].maxLeads) {
-                    campaignTotals[c.campaignId].maxLeads = leads;
-                    campaignTotals[c.campaignId].lastCPL = cpl;
+                // Tomar el máximo de leads
+                if (leads > campaignTotals[key].maxLeads) {
+                    campaignTotals[key].maxLeads = leads;
+                    campaignTotals[key].lastCPL = cpl;
                 }
             });
         });
@@ -271,14 +341,20 @@ const App = () => {
                 </div>
 
                 <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-                    <div className="mb-4">
-                        <label className="text-sm font-semibold text-gray-700 mr-3">Ver estadísticas del mes:</label>
-                        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg bg-white font-medium">
-                            <option value="2025-01">Enero 2025</option>
-                            <option value="2024-12">Diciembre 2024</option>
-                            <option value="2024-11">Noviembre 2024</option>
-                            <option value="2024-10">Octubre 2024</option>
-                        </select>
+                    <div className="mb-4 flex items-center justify-between">
+                        <div>
+                            <label className="text-sm font-semibold text-gray-700 mr-3">Ver estadísticas del mes:</label>
+                            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg bg-white font-medium">
+                                <option value="2025-01">Enero 2025</option>
+                                <option value="2024-12">Diciembre 2024</option>
+                                <option value="2024-11">Noviembre 2024</option>
+                                <option value="2024-10">Octubre 2024</option>
+                            </select>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                            Total registros: {dailyUpdates.length} | 
+                            Para {selectedMonth}: {dailyUpdates.filter(u => u.date && u.date.startsWith(selectedMonth)).length}
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -303,6 +379,12 @@ const App = () => {
                             <div className="text-sm opacity-90">por lead</div>
                         </div>
                     </div>
+
+                    {getMonthlyStats().debug && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+                            ⚠️ {getMonthlyStats().debug}
+                        </div>
+                    )}
                 </div>
 
                 <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
@@ -405,7 +487,18 @@ const App = () => {
                             </div>
                         </div>
 
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4 mb-4">
+                            <div className="flex items-start gap-3 mb-3">
+                                <div className="text-2xl">✅</div>
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-green-900 mb-1">Actualización por campañas</h3>
+                                    <ul className="text-sm text-green-800 space-y-1">
+                                        <li>✓ Puedes actualizar una campaña a la vez</li>
+                                        <li>✓ Las campañas se van acumulando en el mismo día</li>
+                                        <li>✓ Si actualizas una campaña dos veces, se reemplaza solo esa campaña</li>
+                                    </ul>
+                                </div>
+                            </div>
                             <div className="flex items-center gap-4">
                                 <label className="font-semibold text-gray-700">Selecciona campaña a actualizar:</label>
                                 <select 
@@ -431,19 +524,51 @@ const App = () => {
                         </div>
 
                         <div className="space-y-4">
+                            {getUpdateCampaigns().length === 0 && (
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                                    <p className="text-yellow-800 font-semibold">⚠️ Ninguna campaña seleccionada para actualizar</p>
+                                    <p className="text-sm text-yellow-600 mt-1">Selecciona "Todas las campañas" en el menú de arriba</p>
+                                </div>
+                            )}
                             {getUpdateCampaigns().map(c => (
-                                <div key={c.id} className="border rounded-lg p-4">
+                                <div key={c.id} className="border rounded-lg p-4 bg-blue-50">
                                     <div className="flex items-center gap-2 mb-3">
                                         <h3 className="font-semibold text-lg">{c.name}</h3>
                                         <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        <input type="number" placeholder="Leads" value={todayStatus[c.id]?.currentLeads || ''} onChange={(e) => handleStatusChange(c.id, 'currentLeads', e.target.value)} className="px-3 py-2 border rounded-lg"/>
-                                        <input type="number" step="0.01" placeholder="CPL USD" value={todayStatus[c.id]?.currentCPL || ''} onChange={(e) => handleStatusChange(c.id, 'currentCPL', e.target.value)} className="px-3 py-2 border rounded-lg"/>
-                                        <input type="text" placeholder="Comentario" value={todayStatus[c.id]?.comment || ''} onChange={(e) => handleStatusChange(c.id, 'comment', e.target.value)} className="px-3 py-2 border rounded-lg"/>
+                                        <input 
+                                            type="number" 
+                                            placeholder="Leads" 
+                                            value={todayStatus[c.id]?.currentLeads || ''} 
+                                            onChange={(e) => handleStatusChange(c.id, 'currentLeads', e.target.value)} 
+                                            className="px-3 py-2 border rounded-lg"
+                                        />
+                                        <input 
+                                            type="number" 
+                                            step="0.01" 
+                                            placeholder="CPL USD" 
+                                            value={todayStatus[c.id]?.currentCPL || ''} 
+                                            onChange={(e) => handleStatusChange(c.id, 'currentCPL', e.target.value)} 
+                                            className="px-3 py-2 border rounded-lg"
+                                        />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Comentario" 
+                                            value={todayStatus[c.id]?.comment || ''} 
+                                            onChange={(e) => handleStatusChange(c.id, 'comment', e.target.value)} 
+                                            className="px-3 py-2 border rounded-lg"
+                                        />
                                     </div>
+                                    {(todayStatus[c.id]?.currentLeads || todayStatus[c.id]?.currentCPL || todayStatus[c.id]?.comment) && (
+                                        <div className="mt-2 text-xs text-green-600 font-semibold">✓ Esta campaña tiene datos y se guardará</div>
+                                    )}
                                 </div>
                             ))}
+                            <div className="bg-gray-100 rounded-lg p-3 text-sm">
+                                <strong>Total de campañas visibles:</strong> {getUpdateCampaigns().length} | 
+                                <strong className="ml-2">Con datos para guardar:</strong> {Object.keys(todayStatus).filter(id => todayStatus[id]?.currentLeads || todayStatus[id]?.currentCPL || todayStatus[id]?.comment).length}
+                            </div>
                         </div>
 
                         <div className="bg-gray-50 rounded-lg p-4 mt-6">
