@@ -255,4 +255,292 @@ const App = () => {
             <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
                 <div className="text-center">
                     <div className="text-2xl font-bold text-blue-600 mb-4">Cargando datos...</div>
-                    <div className="animate-spin rounded-full h-16 w-16 bor
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+            <div className="max-w-7xl mx-auto">
+                <div className="text-center mb-6">
+                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-2">STATUS CAMPAÑAS VIAMAR</h1>
+                    <div className="h-1 w-32 mx-auto bg-gradient-to-r from-blue-600 to-purple-600 rounded-full"></div>
+                    <div className="mt-2 text-sm text-green-600 font-semibold">🔄 Datos compartidos en tiempo real</div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <div className="mb-4">
+                        <label className="text-sm font-semibold text-gray-700 mr-3">Ver estadísticas del mes:</label>
+                        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg bg-white font-medium">
+                            <option value="2025-01">Enero 2025</option>
+                            <option value="2024-12">Diciembre 2024</option>
+                            <option value="2024-11">Noviembre 2024</option>
+                            <option value="2024-10">Octubre 2024</option>
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-4 text-white">
+                            <div className="text-sm opacity-90">Total Leads del Mes</div>
+                            <div className="text-3xl font-bold">{getMonthlyStats().totalLeads}</div>
+                            <div className="text-sm opacity-90">acumulados</div>
+                        </div>
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-4 text-white">
+                            <div className="text-sm opacity-90">Objetivo del Mes</div>
+                            <div className="text-3xl font-bold">{getMonthlyStats().totalObjective}</div>
+                            <div className="text-sm opacity-90">leads meta</div>
+                        </div>
+                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-4 text-white">
+                            <div className="text-sm opacity-90">Progreso Mensual</div>
+                            <div className="text-3xl font-bold">{getMonthlyStats().progress}%</div>
+                            <div className="text-sm opacity-90">del objetivo</div>
+                        </div>
+                        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-4 text-white">
+                            <div className="text-sm opacity-90">CPL Promedio Ponderado</div>
+                            <div className="text-3xl font-bold">${getMonthlyStats().avgCPL}</div>
+                            <div className="text-sm opacity-90">por lead</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-2xl font-bold text-gray-800">Mis Campañas</h2>
+                        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                            <Plus />Nueva Campaña
+                        </button>
+                    </div>
+
+                    {showForm && (
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input type="text" placeholder="Nombre" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="px-4 py-2 border rounded-lg"/>
+                                <select value={formData.platform} onChange={(e) => setFormData({...formData, platform: e.target.value})} className="px-4 py-2 border rounded-lg">
+                                    <option value="">Plataforma</option>
+                                    <option value="Meta">Meta</option>
+                                    <option value="Google PMAX">Google PMAX</option>
+                                    <option value="Google Búsqueda">Google Búsqueda</option>
+                                    <option value="Google Display">Google Display</option>
+                                    <option value="Google Video">Google Video</option>
+                                </select>
+                                <input type="number" placeholder="Objetivo" value={formData.objective} onChange={(e) => setFormData({...formData, objective: e.target.value})} className="px-4 py-2 border rounded-lg"/>
+                                <input type="number" step="0.01" placeholder="CPL USD" value={formData.plannedCPL} onChange={(e) => setFormData({...formData, plannedCPL: e.target.value})} className="px-4 py-2 border rounded-lg"/>
+                            </div>
+                            <div className="flex gap-2 mt-4">
+                                <button onClick={handleAddCampaign} className="bg-blue-600 text-white px-6 py-2 rounded-lg">Agregar</button>
+                                <button onClick={() => setShowForm(false)} className="bg-gray-300 px-6 py-2 rounded-lg">Cancelar</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {campaigns.length > 0 ? (
+                        <div>
+                            <div className="mb-4 flex items-center gap-3">
+                                <label className="text-sm font-semibold text-gray-700">Ver campaña:</label>
+                                <select value={selectedCampaign} onChange={(e) => setSelectedCampaign(e.target.value)} className="flex-1 bg-white border border-gray-300 rounded-lg px-4 py-2">
+                                    <option value="all">Todas las campañas ({campaigns.length})</option>
+                                    {campaigns.map(c => <option key={c.id} value={c.id}>{c.name} - {c.platform}</option>)}
+                                </select>
+                            </div>
+                            
+                            <div className="space-y-2">
+                                {getFilteredCampaigns().map(c => (
+                                    <div key={c.id} className="bg-gray-50 rounded-lg p-4 flex justify-between items-center">
+                                        {editingCampaign?.id === c.id ? (
+                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-2">
+                                                <input type="text" value={editingCampaign.name} onChange={(e) => setEditingCampaign({...editingCampaign, name: e.target.value})} className="px-3 py-1 border rounded"/>
+                                                <select value={editingCampaign.platform} onChange={(e) => setEditingCampaign({...editingCampaign, platform: e.target.value})} className="px-3 py-1 border rounded">
+                                                    <option value="Meta">Meta</option>
+                                                    <option value="Google PMAX">Google PMAX</option>
+                                                    <option value="Google Búsqueda">Google Búsqueda</option>
+                                                </select>
+                                                <input type="number" value={editingCampaign.objective} onChange={(e) => setEditingCampaign({...editingCampaign, objective: e.target.value})} className="px-3 py-1 border rounded"/>
+                                                <input type="number" step="0.01" value={editingCampaign.plannedCPL} onChange={(e) => setEditingCampaign({...editingCampaign, plannedCPL: e.target.value})} className="px-3 py-1 border rounded"/>
+                                            </div>
+                                        ) : (
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-semibold">{c.name}</span>
+                                                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
+                                                </div>
+                                                <div className="text-sm text-gray-600">Objetivo: {c.objective} | CPL: ${c.plannedCPL || 'N/A'}</div>
+                                            </div>
+                                        )}
+                                        <div className="flex gap-2">
+                                            {editingCampaign?.id === c.id ? (
+                                                <>
+                                                    <button onClick={handleEditCampaign} className="text-green-600"><Save /></button>
+                                                    <button onClick={() => setEditingCampaign(null)} className="text-gray-600"><X /></button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <button onClick={() => setEditingCampaign(c)} className="text-blue-600"><Edit2 /></button>
+                                                    <button onClick={() => handleDeleteCampaign(c.id)} className="text-red-500"><Trash2 /></button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center text-gray-500 py-8">
+                            No hay campañas configuradas. Agrega tu primera campaña para comenzar.
+                        </div>
+                    )}
+                </div>
+
+                {campaigns.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-4">
+                                <h2 className="text-2xl font-bold">Actualización</h2>
+                                <input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="px-3 py-1 border rounded-lg"/>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={copyToClipboard} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg"><Copy />Copiar</button>
+                                <button onClick={handleSaveDailyStatus} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg"><Save />Guardar</button>
+                            </div>
+                        </div>
+
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                            <div className="flex items-center gap-4">
+                                <label className="font-semibold text-gray-700">Selecciona campaña a actualizar:</label>
+                                <select 
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === 'all') {
+                                            setSelectedUpdateCampaigns(campaigns.map(c => c.id));
+                                        } else if (val === 'none') {
+                                            setSelectedUpdateCampaigns([]);
+                                        } else {
+                                            setSelectedUpdateCampaigns([val]);
+                                        }
+                                    }}
+                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-white"
+                                >
+                                    <option value="all">Todas las campañas</option>
+                                    <option value="none">Ninguna</option>
+                                    {campaigns.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name} - {c.platform}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {getUpdateCampaigns().map(c => (
+                                <div key={c.id} className="border rounded-lg p-4">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <h3 className="font-semibold text-lg">{c.name}</h3>
+                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <input type="number" placeholder="Leads" value={todayStatus[c.id]?.currentLeads || ''} onChange={(e) => handleStatusChange(c.id, 'currentLeads', e.target.value)} className="px-3 py-2 border rounded-lg"/>
+                                        <input type="number" step="0.01" placeholder="CPL USD" value={todayStatus[c.id]?.currentCPL || ''} onChange={(e) => handleStatusChange(c.id, 'currentCPL', e.target.value)} className="px-3 py-2 border rounded-lg"/>
+                                        <input type="text" placeholder="Comentario" value={todayStatus[c.id]?.comment || ''} onChange={(e) => handleStatusChange(c.id, 'comment', e.target.value)} className="px-3 py-2 border rounded-lg"/>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="bg-gray-50 rounded-lg p-4 mt-6">
+                            <h3 className="font-semibold text-lg mb-3">Preview</h3>
+                            <pre className="whitespace-pre-wrap text-sm bg-white p-4 rounded border">{generateMessage()}</pre>
+                        </div>
+                    </div>
+                )}
+
+                {dailyUpdates.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <h2 className="text-2xl font-bold mb-4">Historial</h2>
+                        
+                        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <select value={historyFilterPlatform} onChange={(e) => setHistoryFilterPlatform(e.target.value)} className="px-3 py-2 border rounded-lg">
+                                    <option value="all">Todas las plataformas</option>
+                                    {getUniquePlatforms().map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                                <input type="date" value={historyFilterDateFrom} onChange={(e) => setHistoryFilterDateFrom(e.target.value)} className="px-3 py-2 border rounded-lg" placeholder="Desde"/>
+                                <input type="date" value={historyFilterDateTo} onChange={(e) => setHistoryFilterDateTo(e.target.value)} className="px-3 py-2 border rounded-lg" placeholder="Hasta"/>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {getFilteredHistory().map(u => {
+                                const tl = u.campaigns.reduce((s, c) => s + (parseInt(c.currentLeads) || 0), 0);
+                                const to = u.campaigns.reduce((s, c) => s + (parseInt(c.objective) || 0), 0);
+                                const p = to > 0 ? ((tl / to) * 100).toFixed(1) : 0;
+                                
+                                return (
+                                    <div key={u.id} className="border-2 rounded-xl p-5 bg-gradient-to-r from-white to-gray-50">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <Calendar />
+                                                    <span className="font-bold text-xl">{new Date(u.date).toLocaleDateString('es-ES', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</span>
+                                                </div>
+                                                <div className="flex gap-4 text-sm">
+                                                    <span>{u.campaigns.length} campañas</span>
+                                                    <span>Total: <strong className="text-blue-600">{tl}</strong> de {to}</span>
+                                                    <span>Progreso: <strong className="text-green-600">{p}%</strong></span>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => loadUpdate(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 /></button>
+                                                <button onClick={() => deleteUpdate(u.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 /></button>
+                                            </div>
+                                        </div>
+
+                                        <div className="mb-4">
+                                            <div className="w-full bg-gray-200 rounded-full h-3">
+                                                <div className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full" style={{width: `${Math.min(p, 100)}%`}}></div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {u.campaigns.map((c, i) => {
+                                                const cp = c.objective > 0 ? ((parseInt(c.currentLeads) || 0) / parseInt(c.objective) * 100).toFixed(0) : 0;
+                                                return (
+                                                    <div key={i} className="bg-white rounded-lg p-4 border hover:border-blue-300 shadow-sm">
+                                                        <div className="flex justify-between mb-2">
+                                                            <div className="flex-1">
+                                                                <div className="font-semibold truncate">{c.name}</div>
+                                                                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{c.platform}</span>
+                                                            </div>
+                                                            <div className="text-2xl font-bold text-blue-600">{cp}%</div>
+                                                        </div>
+                                                        {c.currentLeads && (
+                                                            <div className="mt-3">
+                                                                <div className="flex justify-between text-sm mb-1">
+                                                                    <span>Leads</span>
+                                                                    <span className="font-semibold">{c.currentLeads}/{c.objective}</span>
+                                                                </div>
+                                                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                    <div className="bg-blue-500 h-2 rounded-full" style={{width: `${Math.min(cp, 100)}%`}}></div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {c.currentCPL && <div className="mt-2 text-sm flex justify-between"><span>CPL:</span><span className="font-semibold text-green-600">${c.currentCPL}</span></div>}
+                                                        {c.comment && <div className="mt-2 pt-2 border-t text-xs text-gray-600 italic">{c.comment}</div>}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
